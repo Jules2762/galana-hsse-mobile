@@ -1,4 +1,6 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/widgets/bottom_quick_action.dart';
 
@@ -160,33 +162,60 @@ class _ChangePasswordPageState
       loading = true;
     });
 
-    await Future.delayed(
-      const Duration(seconds: 1),
-    );
+    try {
+      await ApiClient.ensureAuthenticated();
+      final response = await ApiClient.dio.put(
+        '/home/profile/password',
+        data: {
+          'current_password': currentPassword,
+          'password': password,
+          'password_confirmation': confirmPassword,
+        },
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+      });
 
-    setState(() {
-      loading = false;
-    });
-
-    ScaffoldMessenger.of(context)
-        .showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Mot de passe modifié avec succès.",
+      if (response.statusCode == 200) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            backgroundColor: Color(0xFF15803D),
+            content: Text("Mot de passe modifié avec succès."),
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+      });
+      final msg = e.response?.data?['message']?.toString() ??
+          "Échec de la modification du mot de passe.";
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.danger,
+          content: Text(msg),
         ),
-      ),
-    );
-
-    Navigator.pop(context);
+      );
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        loading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          backgroundColor: AppColors.danger,
+          content: Text("Une erreur inattendue est survenue."),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    final theme =
-        Theme.of(context);
-
     return Scaffold(
       backgroundColor:
           AppColors.lightBackground,

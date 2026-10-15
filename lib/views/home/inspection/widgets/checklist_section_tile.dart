@@ -35,12 +35,17 @@ class _ChecklistSectionTileState
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: widget.borderColor != null
-            ? Border.all(
-                color: widget.borderColor!,
-                width: 1.2,
-              )
-            : null,
+        border: Border.all(
+          color: widget.borderColor ?? const Color(0xFFE2E8F0),
+          width: widget.borderColor != null ? 1.2 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: ExpansionTile(
         tilePadding: const EdgeInsets.symmetric(

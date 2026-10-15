@@ -9,6 +9,7 @@ class InspectionCard extends StatelessWidget {
   final String date;
   final String status;
   final double progress;
+  final bool isPendingSync;
   final VoidCallback? onTap;
 
   const InspectionCard({
@@ -19,8 +20,10 @@ class InspectionCard extends StatelessWidget {
     required this.date,
     required this.status,
     required this.progress,
+    this.isPendingSync = false,
     this.onTap,
   });
+
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +36,7 @@ class InspectionCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-
+          border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: .04),
@@ -81,11 +84,43 @@ class InspectionCard extends StatelessWidget {
                   ),
                 ),
 
-                InspectionStatusBadge(
-                  status: status,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    InspectionStatusBadge(
+                      status: status,
+                    ),
+                    if (isPendingSync) ...[
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFEF3C7),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: const Color(0xFFFDE68A)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.cloud_upload_outlined, size: 11, color: Color(0xFFD97706)),
+                            SizedBox(width: 3),
+                            Text(
+                              "À synchroniser",
+                              style: TextStyle(
+                                fontSize: 9.5,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFB45309),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),
+
 
             const SizedBox(height: 20),
 

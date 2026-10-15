@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -13,27 +14,24 @@ class _EditProfilePageState
     extends State<EditProfilePage> {
   final _formKey = GlobalKey<FormState>();
 
-  final nameController = TextEditingController(
-    text: "Jules Rakoto",
-  );
+  late final TextEditingController nameController;
+  late final TextEditingController emailController;
+  late final TextEditingController phoneController;
+  late final TextEditingController functionController;
+  late final TextEditingController departmentController;
 
-  final emailController = TextEditingController(
-    text: "jules.rakoto@galana.mg",
-  );
-
-  final phoneController = TextEditingController(
-    text: "+261 34 12 345 67",
-  );
-
-  final functionController =
-      TextEditingController(
-    text: "Superviseur terrain",
-  );
-
-  final departmentController =
-      TextEditingController(
-    text: "Opérations",
-  );
+  @override
+  void initState() {
+    super.initState();
+    final user = ApiClient.currentUser;
+    final fullName = user?['name']?.toString() ??
+        ("${user?['first_name'] ?? 'Jules'} ${user?['last_name'] ?? 'ARIMANANA'}").trim();
+    nameController = TextEditingController(text: fullName);
+    emailController = TextEditingController(text: user?['email']?.toString() ?? "julesari_ext@galana.mg");
+    phoneController = TextEditingController(text: user?['phone']?.toString() ?? "+261 34 12 345 67");
+    functionController = TextEditingController(text: user?['job_title']?.toString() ?? "Superviseur Terrain HSSE");
+    departmentController = TextEditingController(text: user?['department']?.toString() ?? "Opérations & Sûreté");
+  }
 
   @override
   void dispose() {

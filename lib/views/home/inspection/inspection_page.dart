@@ -1,135 +1,122 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
-import 'package:gestion_hsse/views/home/inspection/widgets/inspection_card.dart';
-
-import 'package:gestion_hsse/views/home/inspection/widgets/inspection_filter_chip.dart';
+import 'package:gestion_hsse/cores/themes/app_colors.dart';
+import 'package:gestion_hsse/views/home/inspection/checklist/checklist_list_view.dart';
+import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
+import 'package:gestion_hsse/views/home/inspection/vmc/vmc_list_view.dart';
+import 'package:gestion_hsse/views/home/inspection/widgets/inspection_segment_tab.dart';
+import 'package:gestion_hsse/views/home/inspection/widgets/sync_status_banner.dart';
 
 class InspectionsPage extends StatefulWidget {
-  const InspectionsPage({super.key});
+  final int initialTab;
+
+  const InspectionsPage({
+    super.key,
+    this.initialTab = 0,
+  });
 
   @override
   State<InspectionsPage> createState() => _InspectionsPageState();
 }
 
-class _InspectionsPageState extends State<InspectionsPage> {
-  int selectedFilter = 0;
+class _InspectionsPageState extends State<InspectionsPage>
+    with SingleTickerProviderStateMixin {
+  TabController? _tabController;
+  int _currentTabIndex = 0;
 
-  final List<String> filters = const [
-    "Tous",
-    "En cours",
-    "Terminée",
-    "Planifiée",
-  ];
+  @override
+  void initState() {
+    super.initState();
+    _currentTabIndex = widget.initialTab;
+    _ensureTabController();
+  }
+
+  void _ensureTabController() {
+    if (_tabController == null) {
+      _tabController = TabController(
+        length: 3,
+        vsync: this,
+        initialIndex: _currentTabIndex,
+      );
+      _tabController!.addListener(_handleTabChange);
+    }
+  }
+
+  void _handleTabChange() {
+    if (_tabController != null && _tabController!.index != _currentTabIndex) {
+      setState(() {
+        _currentTabIndex = _tabController!.index;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _tabController?.removeListener(_handleTabChange);
+    _tabController?.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-
+    _ensureTabController();
+    return Scaffold(
+      backgroundColor: AppColors.lightBackground,
+      body: Column(
         children: [
-          // ==========================
-          // SEARCH
-          // ==========================
-          TextField(
-            decoration: InputDecoration(
-              hintText: "Rechercher une inspection...",
-              prefixIcon: const Icon(Icons.search),
+          // ==================== BANNIÈRE AUTO-SYNC ====================
+          const SyncStatusBanner(),
+
+          // ==================== SEGMENTED CONTROLLER ====================
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+
+            child: InspectionSegmentTab(
+              selectedIndex: _currentTabIndex,
+              vmcCount: 14,
+              checklistCount: 8,
+              equipmentCount: 45,
+              onTabSelected: (index) {
+                setState(() {
+                  _currentTabIndex = index;
+                });
+                _tabController?.animateTo(index);
+              },
             ),
           ),
 
-          const SizedBox(height: 20),
+          // ==================== TAB BAR VIEW ====================
+          Expanded(
+            child: TabBarView(
+              controller: _tabController!,
+              children: [
+                // 1. VMC
+                VmcListView(
+                  onVmcTap: (vmc) {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.vmcDetail,
+                      arguments: vmc,
+                    );
+                  },
+                ),
 
-          // ==========================
-          // FILTERS
-          // ==========================
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
+                // 2. CHECKLISTS
+                const ChecklistListView(),
 
-            child: Row(
-              children: List.generate(filters.length, (index) {
-                return Padding(
-                  padding: const EdgeInsets.only(right: 10),
-
-                  child: InspectionFilterChip(
-                    label: filters[index],
-
-                    selected: selectedFilter == index,
-
-                    onTap: () {
-                      setState(() {
-                        selectedFilter = index;
-                      });
-                    },
-                  ),
-                );
-              }),
+                // 3. SUIVI DU MATÉRIEL
+                EquipmentMonitoringListView(
+                  onEquipmentTap: (equipment) {
+                    Navigator.pushNamed(
+                      context,
+                      AppRoutes.equipmentDetail,
+                      arguments: equipment,
+                    );
+                  },
+                ),
+              ],
             ),
           ),
-
-          const SizedBox(height: 24),
-
-          // ==========================
-          // INSPECTIONS
-          // ==========================
-          InspectionCard(
-            title: "Inspection Sécurité Incendie",
-            site: "Dépôt Antsirabe",
-            inspector: "Jules Rakoto",
-            date: "15 Juil 2025",
-            progress: .65,
-            status: "En cours",
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.checklistDetail);
-            },
-          ),
-
-          SizedBox(height: 16),
-
-          InspectionCard(
-            title: "Audit EPI Terrain",
-            site: "Terminal Tamatave",
-            inspector: "Jules Rakoto",
-            date: "15 Juil 2025",
-            progress: 1,
-            status: "Terminée",
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.checklistDetail);
-            },
-          ),
-
-          SizedBox(height: 16),
-
-          InspectionCard(
-            title: "Contrôle Stockage Carburant",
-            site: "Station Majunga",
-            inspector: "Jules Rakoto",
-            date: "15 Juil 2025",
-            progress: .12,
-            status: "En cours",
-            onTap: () {
-              Navigator.pushNamed(context, AppRoutes.checklistDetail);
-            },
-          ),
-
-          SizedBox(height: 16),
-
-          InspectionCard(
-            title: "Inspection Environnementale",
-            site: "Dépôt Ivato",
-            inspector: "Jules Rakoto",
-            date: "15 Juil 2025",
-            progress: 0,
-            status: "Planifiée",
-            onTap:() {
-              Navigator.pushNamed(context, AppRoutes.checklistDetail);
-            }, 
-            
-          ),
-
-          const SizedBox(height: 120),
         ],
       ),
     );

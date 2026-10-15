@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/widgets/inspection_app_bar.dart';
 
@@ -162,7 +163,7 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
                       const SizedBox(height: 8),
 
                       DropdownButtonFormField<String>(
-                        value: department,
+                        initialValue: department,
 
                         decoration: const InputDecoration(),
 
@@ -204,7 +205,40 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
                 height: 54,
 
                 child: ElevatedButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    if (descriptionController.text.trim().isEmpty) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("Veuillez saisir une description de l'action"),
+                        ),
+                      );
+                      return;
+                    }
+                    final desc = descriptionController.text.trim();
+                    final actionData = {
+                      'description': desc,
+                      'department': department,
+                      'assignee': 'Marie Razafi (Superviseur)',
+                      'priority': 'Haute',
+                    };
+
+                    SyncService.instance.queueAction(
+                      SyncAction(
+                        id: 'action_create_${DateTime.now().millisecondsSinceEpoch}',
+                        type: 'ACTION_CREATE',
+                        title: 'Action corrective : $desc',
+                        endpoint: '/home/actions/checklist',
+                        method: 'POST',
+                        payload: {
+                          'description': desc,
+                          'status': 'PENDING',
+                        },
+                        createdAt: DateTime.now(),
+                      ),
+                    );
+
+                    Navigator.pop(context, actionData);
+                  },
 
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.primary,

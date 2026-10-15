@@ -5,6 +5,8 @@ import 'package:gestion_hsse/views/auth/reset_password_page.dart';
 import 'package:gestion_hsse/views/home/inspection/checklist_detail_page.dart';
 import 'package:gestion_hsse/views/home/inspection/corrective_action_page.dart';
 import 'package:gestion_hsse/views/home/inspection/inspection_question_page.dart';
+import 'package:gestion_hsse/views/home/inspection/equipment/equipment_detail_page.dart';
+import 'package:gestion_hsse/views/home/inspection/vmc/vmc_detail_page.dart';
 import 'package:gestion_hsse/views/home/profile/change_password_page.dart';
 import 'package:gestion_hsse/views/home/profile/edit_profile_page.dart';
 import 'package:gestion_hsse/views/home/rapport/report_details_page.dart';
@@ -24,12 +26,16 @@ class AppRoutes {
   static const String reportDetails ="/report-details";
   static const String editProfile ="/edit-profile";
   static const String changePassword ="/change-password";
+  static const String equipmentDetail = "/equipment-detail";
+  static const String vmcDetail = "/vmc-detail";
+  static const String inspections = "/inspections";
 
   static Map<String, WidgetBuilder> routes = {
     login: (_) => const LoginPage(),
     forgotPassword: (_) => const ForgotPasswordPage(),
     resetPassword: (_) => const ResetPasswordPage(),
     home: (_) => const HomeLayout(),
+    inspections: (_) => const HomeLayout(initialIndex: 1),
     checklistDetail: (_) => const ChecklistDetailPage(),
     inspectionQuestion: (_) => const InspectionQuestionPage(),
     correctiveAction: (_) => const CorrectiveActionPage(),
@@ -37,5 +43,7 @@ class AppRoutes {
     reportDetails: (_) => const ReportDetailPage(),
     editProfile: (_) => const EditProfilePage(),
     changePassword: (_) => const ChangePasswordPage(),
+    equipmentDetail: (_) => const EquipmentDetailPage(),
+    vmcDetail: (_) => const VmcDetailPage(),
   };
 }

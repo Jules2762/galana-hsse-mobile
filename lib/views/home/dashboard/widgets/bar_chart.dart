@@ -5,6 +5,7 @@ class BarChart extends StatelessWidget {
   final String day;
 
   const BarChart({
+    super.key,
     required this.value,
     required this.day,
   });
