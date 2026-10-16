@@ -11,6 +11,7 @@ class OfflineStorageService {
   static const String _keyVmcs = 'offline_cached_vmcs';
   static const String _keyChecklists = 'offline_cached_checklists';
   static const String _keyEquipments = 'offline_cached_equipments';
+  static const String _keyEquipmentMonitorings = 'offline_cached_equipment_monitorings';
   static const String _keyReports = 'offline_cached_reports';
   static const String _keyVmcDetailPrefix = 'offline_cached_vmc_detail_';
 
@@ -214,6 +215,170 @@ class OfflineStorageService {
         items.insert(0, updated);
       }
       await cacheEquipments(items);
+    } catch (_) {}
+  }
+
+  /// Ajoute un nouvel équipement en local
+  static Future<void> addCachedEquipment(EquipmentItemData item) async {
+    try {
+      final items = await getCachedEquipments();
+      items.insert(0, item);
+      await cacheEquipments(items);
+    } catch (_) {}
+  }
+
+  /// Supprime un équipement du cache local
+  static Future<void> deleteCachedEquipment(int? id, String tagNumber) async {
+    try {
+      final items = await getCachedEquipments();
+      items.removeWhere((item) {
+        if (id != null && item.id != null) return item.id == id;
+        return item.tagNumber == tagNumber;
+      });
+      await cacheEquipments(items);
+    } catch (_) {}
+  }
+
+  // ==========================================
+  // SUIVIS MATÉRIELS (EQUIPMENT MONITORINGS)
+  // ==========================================
+
+  /// Sauvegarde la liste des sessions de suivi matériel en local
+  static Future<void> cacheEquipmentMonitorings(List<EquipmentMonitoringData> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = items.map((m) => m.toJson()).toList();
+      await prefs.setString(_keyEquipmentMonitorings, jsonEncode(list));
+    } catch (e) {
+      debugPrint('[OfflineStorage] Erreur cache Suivis Matériels: $e');
+    }
+  }
+
+  /// Récupère la liste des sessions de suivi matériel en local
+  static Future<List<EquipmentMonitoringData>> getCachedEquipmentMonitorings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyEquipmentMonitorings);
+      if (raw != null && raw.isNotEmpty) {
+        final List list = jsonDecode(raw);
+        return list.map((json) => EquipmentMonitoringData.fromJson(Map<String, dynamic>.from(json))).toList();
+      }
+    } catch (e) {
+      debugPrint('[OfflineStorage] Erreur lecture Suivis Matériels en cache: $e');
+    }
+    return [];
+  }
+
+  /// Ajoute une nouvelle session de suivi matériel en local
+  static Future<void> addCachedEquipmentMonitoring(EquipmentMonitoringData item) async {
+    try {
+      final items = await getCachedEquipmentMonitorings();
+      items.insert(0, item);
+      await cacheEquipmentMonitorings(items);
+    } catch (_) {}
+  }
+
+  /// Met à jour une session de suivi matériel en local
+  static Future<void> updateCachedEquipmentMonitoring(EquipmentMonitoringData updated) async {
+    try {
+      final items = await getCachedEquipmentMonitorings();
+      final index = items.indexWhere((m) {
+        if (updated.id != null && m.id != null) return m.id.toString() == updated.id.toString();
+        return m.reference == updated.reference;
+      });
+      if (index != -1) {
+        items[index] = updated;
+      } else {
+        items.insert(0, updated);
+      }
+      await cacheEquipmentMonitorings(items);
+    } catch (_) {}
+  }
+
+  /// Supprime une session de suivi matériel du cache local
+  static Future<void> deleteCachedEquipmentMonitoring(dynamic id) async {
+    try {
+      final items = await getCachedEquipmentMonitorings();
+      items.removeWhere((m) => m.id?.toString() == id?.toString() || m.reference == id?.toString());
+      await cacheEquipmentMonitorings(items);
+    } catch (_) {}
+  }
+
+  /// Ajoute un matériel dans une session de suivi spécifique en local
+  static Future<void> addItemToMonitoringInCache(dynamic monitoringId, EquipmentItemData item) async {
+    try {
+      final monitorings = await getCachedEquipmentMonitorings();
+      final idx = monitorings.indexWhere((m) =>
+          m.id?.toString() == monitoringId?.toString() || m.reference == monitoringId?.toString());
+      if (idx != -1) {
+        final current = monitorings[idx];
+        final updatedItems = List<EquipmentItemData>.from(current.items);
+        updatedItems.insert(0, item);
+        final total = updatedItems.length;
+        final confCount = updatedItems.where((i) => i.conformity).length;
+        final rate = total > 0 ? (confCount / total) * 100.0 : 100.0;
+        monitorings[idx] = current.copyWith(
+          items: updatedItems,
+          conformityRate: rate,
+        );
+        await cacheEquipmentMonitorings(monitorings);
+      }
+      await addCachedEquipment(item);
+    } catch (_) {}
+  }
+
+  /// Met à jour un matériel dans une session de suivi en local
+  static Future<void> updateItemInMonitoringInCache(dynamic monitoringId, EquipmentItemData item) async {
+    try {
+      final monitorings = await getCachedEquipmentMonitorings();
+      final idx = monitorings.indexWhere((m) =>
+          m.id?.toString() == monitoringId?.toString() || m.reference == monitoringId?.toString());
+      if (idx != -1) {
+        final current = monitorings[idx];
+        final updatedItems = List<EquipmentItemData>.from(current.items);
+        final itemIdx = updatedItems.indexWhere((i) =>
+            (item.id != null && i.id != null && i.id == item.id) || i.tagNumber == item.tagNumber);
+        if (itemIdx != -1) {
+          updatedItems[itemIdx] = item;
+        } else {
+          updatedItems.insert(0, item);
+        }
+        final total = updatedItems.length;
+        final confCount = updatedItems.where((i) => i.conformity).length;
+        final rate = total > 0 ? (confCount / total) * 100.0 : 100.0;
+        monitorings[idx] = current.copyWith(
+          items: updatedItems,
+          conformityRate: rate,
+        );
+        await cacheEquipmentMonitorings(monitorings);
+      }
+      await updateCachedEquipment(item);
+    } catch (_) {}
+  }
+
+  /// Supprime un matériel d'une session de suivi en local
+  static Future<void> deleteItemFromMonitoringInCache(dynamic monitoringId, int? itemId, String tagNumber) async {
+    try {
+      final monitorings = await getCachedEquipmentMonitorings();
+      final idx = monitorings.indexWhere((m) =>
+          m.id?.toString() == monitoringId?.toString() || m.reference == monitoringId?.toString());
+      if (idx != -1) {
+        final current = monitorings[idx];
+        final updatedItems = List<EquipmentItemData>.from(current.items);
+        updatedItems.removeWhere((i) {
+          if (itemId != null && i.id != null) return i.id == itemId;
+          return i.tagNumber == tagNumber;
+        });
+        final total = updatedItems.length;
+        final confCount = updatedItems.where((i) => i.conformity).length;
+        final rate = total > 0 ? (confCount / total) * 100.0 : 100.0;
+        monitorings[idx] = current.copyWith(
+          items: updatedItems,
+          conformityRate: rate,
+        );
+        await cacheEquipmentMonitorings(monitorings);
+      }
+      await deleteCachedEquipment(itemId, tagNumber);
     } catch (_) {}
   }
 

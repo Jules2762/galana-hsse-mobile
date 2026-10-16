@@ -224,6 +224,8 @@ class SyncService extends ChangeNotifier {
           response = await ApiClient.dio.patch(action.endpoint, data: action.payload, options: options);
         } else if (action.method.toUpperCase() == 'PUT') {
           response = await ApiClient.dio.put(action.endpoint, data: action.payload, options: options);
+        } else if (action.method.toUpperCase() == 'DELETE') {
+          response = await ApiClient.dio.delete(action.endpoint, data: action.payload, options: options);
         } else {
           response = await ApiClient.dio.post(action.endpoint, data: action.payload, options: options);
         }

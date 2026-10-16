@@ -7,6 +7,237 @@ import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
 
 class EquipmentService {
+  static const List<EquipmentMonitoringData> _defaultMonitorings = [
+    EquipmentMonitoringData(
+      id: 1,
+      reference: "#EQ-1",
+      siteName: "Station Majunga",
+      date: "15 Oct 2026",
+      status: "En cours",
+      rawStatus: "IN_PROGRESS",
+      inspector: "Jules Rakoto",
+      conformityRate: 75.0,
+      initialConformityRate: 75.0,
+      observations: "Inspection périodique terrain en cours.",
+      items: [
+        EquipmentItemData(
+          id: 101,
+          monitoringId: 1,
+          tagNumber: "EXT-P50-01",
+          designation: "Extincteur 50kg Poudre sur roues",
+          type: "Extincteur P50",
+          site: "Station Majunga",
+          location: "Îlot B - Pompes Gasoil",
+          lastControlDate: "15 Oct 2026",
+          nextDueDate: "15 Nov 2026",
+          status: "Conforme",
+          pressureStatus: "Normal (14 bars)",
+          conformity: true,
+          comment: "Pression conforme, goupille scellée",
+        ),
+        EquipmentItemData(
+          id: 102,
+          monitoringId: 1,
+          tagNumber: "EXT-P9-02",
+          designation: "Extincteur Portatif 9kg ABC",
+          type: "Extincteur P9",
+          site: "Station Majunga",
+          location: "Boutique & Caisse",
+          lastControlDate: "15 Oct 2026",
+          nextDueDate: "15 Nov 2026",
+          status: "Conforme",
+          pressureStatus: "Normal (12 bars)",
+          conformity: true,
+          comment: "Accès dégagé, signalétique en place",
+        ),
+        EquipmentItemData(
+          id: 103,
+          monitoringId: 1,
+          tagNumber: "EXT-CO2-01",
+          designation: "Extincteur CO2 5kg",
+          type: "Extincteur CO2",
+          site: "Station Majunga",
+          location: "Local Technique TGBT",
+          lastControlDate: "15 Oct 2026",
+          nextDueDate: "15 Nov 2026",
+          status: "Non-conforme",
+          pressureStatus: "Contrôle requis",
+          conformity: false,
+          comment: "Goupille plastique endommagée à remplacer",
+        ),
+        EquipmentItemData(
+          id: 104,
+          monitoringId: 1,
+          tagNumber: "BAC-RET-01",
+          designation: "Bac de Rétention Hydrocarbures",
+          type: "Cuves & Bacs",
+          site: "Station Majunga",
+          location: "Zone Dépotage Camions",
+          lastControlDate: "15 Oct 2026",
+          nextDueDate: "15 Nov 2026",
+          status: "Conforme",
+          pressureStatus: "Étanche",
+          conformity: true,
+          comment: "Propre et sec, vanne fermée",
+        ),
+      ],
+    ),
+    EquipmentMonitoringData(
+      id: 2,
+      reference: "#EQ-2",
+      siteName: "Terminal Toamasina",
+      date: "12 Oct 2026",
+      status: "Clôturée",
+      rawStatus: "COMPLETED",
+      inspector: "Marie Razafi",
+      conformityRate: 100.0,
+      initialConformityRate: 100.0,
+      observations: "Inspection de conformité complète effectuée avec succès.",
+      items: [
+        EquipmentItemData(
+          id: 201,
+          monitoringId: 2,
+          tagNumber: "EXT-P50-02",
+          designation: "Extincteur 50kg Poudre sur roues",
+          type: "Extincteur P50",
+          site: "Terminal Toamasina",
+          location: "Poste Chargement Sud",
+          lastControlDate: "12 Oct 2026",
+          nextDueDate: "12 Nov 2026",
+          status: "Conforme",
+          pressureStatus: "Normal (14 bars)",
+          conformity: true,
+        ),
+        EquipmentItemData(
+          id: 202,
+          monitoringId: 2,
+          tagNumber: "RIA-01",
+          designation: "Robinet d'Incendie Armé DN 25",
+          type: "RIA",
+          site: "Terminal Toamasina",
+          location: "Hall d'accueil",
+          lastControlDate: "12 Oct 2026",
+          nextDueDate: "12 Nov 2026",
+          status: "Conforme",
+          pressureStatus: "Normal (7 bars)",
+          conformity: true,
+        ),
+        EquipmentItemData(
+          id: 203,
+          monitoringId: 2,
+          tagNumber: "BAC-RET-02",
+          designation: "Bac de Rétention 1200L",
+          type: "Cuves & Bacs",
+          site: "Terminal Toamasina",
+          location: "Parc à fûts",
+          lastControlDate: "12 Oct 2026",
+          nextDueDate: "12 Nov 2026",
+          status: "Conforme",
+          pressureStatus: "Étanche",
+          conformity: true,
+        ),
+      ],
+    ),
+    EquipmentMonitoringData(
+      id: 3,
+      reference: "#EQ-3",
+      siteName: "Dépôt Ivato",
+      date: "16 Oct 2026",
+      status: "Planifiée",
+      rawStatus: "DRAFT",
+      inspector: "ARIMANANA Jules",
+      conformityRate: 100.0,
+      initialConformityRate: 100.0,
+      observations: "Session planifiée - Les matériels seront contrôlés sur le terrain.",
+      items: [],
+    ),
+    EquipmentMonitoringData(
+      id: 4,
+      reference: "#EQ-4",
+      siteName: "Dépôt Antsirabe",
+      date: "05 Oct 2026",
+      status: "Clôturée",
+      rawStatus: "COMPLETED",
+      inspector: "Jules Rakoto",
+      conformityRate: 80.0,
+      initialConformityRate: 80.0,
+      observations: "Contrôle mensuel régulier.",
+      items: [
+        EquipmentItemData(
+          id: 401,
+          monitoringId: 4,
+          tagNumber: "EXT-P9-10",
+          designation: "Extincteur Portatif 9kg Poudre",
+          type: "Extincteur P9",
+          site: "Dépôt Antsirabe",
+          location: "Atelier Mécanique",
+          lastControlDate: "05 Oct 2026",
+          nextDueDate: "20 Oct 2026",
+          status: "Conforme",
+          pressureStatus: "Normal",
+          conformity: true,
+        ),
+        EquipmentItemData(
+          id: 402,
+          monitoringId: 4,
+          tagNumber: "EXT-P6-01",
+          designation: "Extincteur 6kg Eau Pulvérisée",
+          type: "Extincteur P6",
+          site: "Dépôt Antsirabe",
+          location: "Bureaux Administratifs",
+          lastControlDate: "05 Oct 2026",
+          nextDueDate: "20 Oct 2026",
+          status: "Conforme",
+          pressureStatus: "Normal",
+          conformity: true,
+        ),
+        EquipmentItemData(
+          id: 403,
+          monitoringId: 4,
+          tagNumber: "RIA-02",
+          designation: "Robinet d'Incendie Armé",
+          type: "RIA",
+          site: "Dépôt Antsirabe",
+          location: "Zone Stockage",
+          lastControlDate: "05 Oct 2026",
+          nextDueDate: "20 Oct 2026",
+          status: "Non-conforme",
+          pressureStatus: "Fuite joint",
+          conformity: false,
+          comment: "Joint à remplacer sur lance",
+        ),
+        EquipmentItemData(
+          id: 404,
+          monitoringId: 4,
+          tagNumber: "POUB-120",
+          designation: "Poubelle tri sélectif 120L",
+          type: "Déchets & Poubelles",
+          site: "Dépôt Antsirabe",
+          location: "Zone atelier",
+          lastControlDate: "05 Oct 2026",
+          nextDueDate: "20 Oct 2026",
+          status: "Conforme",
+          pressureStatus: "Bon état",
+          conformity: true,
+        ),
+        EquipmentItemData(
+          id: 405,
+          monitoringId: 4,
+          tagNumber: "SIG-EXT-01",
+          designation: "Panneau Signalétique Extincteur",
+          type: "Signalétique",
+          site: "Dépôt Antsirabe",
+          location: "Poste Garde",
+          lastControlDate: "05 Oct 2026",
+          nextDueDate: "20 Oct 2026",
+          status: "Conforme",
+          pressureStatus: "Visible",
+          conformity: true,
+        ),
+      ],
+    ),
+  ];
+
   static const List<EquipmentItemData> _defaultEquipments = [
     EquipmentItemData(
       id: 1,
@@ -53,44 +284,14 @@ class EquipmentService {
       value: 1,
       valueType: "number",
     ),
-    EquipmentItemData(
-      id: 4,
-      tagNumber: "EXT-P50-04",
-      designation: "Extincteur 50kg Poudre sur roues",
-      type: "Extincteur P50",
-      site: "Station Majunga",
-      location: "Îlot B - Pompes Gasoil",
-      lastControlDate: "15 Sep 2026",
-      nextDueDate: "15 Oct 2026",
-      status: "Non-conforme",
-      pressureStatus: "Basse (Goupille manquante)",
-      conformity: false,
-      value: 1,
-      valueType: "number",
-    ),
-    EquipmentItemData(
-      id: 5,
-      tagNumber: "BAC-RET-02",
-      designation: "Bac de Rétention Hydrocarbures 1200L",
-      type: "Cuves & Bacs",
-      site: "Dépôt Ivato",
-      location: "Zone Stockage Fûts & Huiles",
-      lastControlDate: "01 Oct 2026",
-      nextDueDate: "01 Nov 2026",
-      status: "Conforme",
-      pressureStatus: "Étanche",
-      conformity: true,
-      value: 3,
-      valueType: "number",
-    ),
   ];
 
-  /// Récupère la liste des équipements (API en ligne avec fallback stockage hors-ligne)
-  static Future<List<EquipmentItemData>> getEquipments({
+  /// Récupère la liste des sessions de suivi matériel (API en ligne avec fallback local)
+  static Future<List<EquipmentMonitoringData>> getMonitorings({
     String? search,
-    String? category,
+    String? status,
   }) async {
-    // 1. Tentative en ligne via l'API
+    // 1. Tentative en ligne
     try {
       await ApiClient.ensureAuthenticated();
       final response = await ApiClient.dio.get('/home/equipments-monitoring/equipments');
@@ -98,127 +299,432 @@ class EquipmentService {
       if (response.statusCode == 200 && response.data != null) {
         final rawData = response.data['data'] ?? response.data;
         if (rawData is List && rawData.isNotEmpty) {
-          final List<EquipmentItemData> parsedItems = [];
-
+          final List<EquipmentMonitoringData> parsed = [];
           for (final record in rawData) {
             final m = Map<String, dynamic>.from(record);
-            final siteName = m['site_name']?.toString() ?? 'Station Galana';
-            final controlDate = m['date']?.toString() ?? '16 Oct 2026';
-
-            // Modèle 3-tiers : Si le monitoring possède des EquipmentItem
-            if (m['items'] is List && (m['items'] as List).isNotEmpty) {
-              for (final it in (m['items'] as List)) {
-                final itemMap = Map<String, dynamic>.from(it);
-                final itemId = itemMap['id'] is int
-                    ? itemMap['id']
-                    : int.tryParse(itemMap['id']?.toString() ?? '');
-                final bool isConforme =
-                    itemMap['conformity'] == true || itemMap['conformity'] == 1;
-
-                // Extraction des photos / attachments
-                List<String> photoUrls = [];
-                if (itemMap['attachments'] is List) {
-                  photoUrls = (itemMap['attachments'] as List).map<String>((att) {
-                    final attMap = Map<String, dynamic>.from(att);
-                    final path = attMap['file_path']?.toString() ?? '';
-                    if (path.startsWith('http')) return path;
-                    return '${ApiClient.baseUrl.replaceAll('/api', '')}$path';
-                  }).toList();
-                }
-
-                parsedItems.add(EquipmentItemData(
-                  id: itemId,
-                  tagNumber: 'EQ-${itemId ?? itemMap['name']}',
-                  designation: itemMap['name']?.toString() ?? 'Équipement',
-                  type: _formatEquipmentType(itemMap['type']?.toString()),
-                  site: siteName,
-                  location: itemMap['location']?.toString() ?? 'Piste distribution',
-                  lastControlDate: controlDate,
-                  nextDueDate: '16 Nov 2026',
-                  status: isConforme ? 'Conforme' : 'Non-conforme',
-                  pressureStatus: isConforme ? 'Normal (14 bars)' : 'Contrôle requis',
-                  conformity: isConforme,
-                  value: itemMap['value'],
-                  valueType: itemMap['value_type']?.toString() ?? 'number',
-                  attachments: photoUrls,
-                  comment: itemMap['comment']?.toString(),
-                ));
-              }
-            } else {
-              // Fallback si fiche sans sous-items
-              final id = int.tryParse(m['id']?.toString() ?? '');
-              final bool isConforme = (m['conformity_rate'] as num? ?? 100) >= 90;
-              parsedItems.add(EquipmentItemData(
-                id: id,
-                tagNumber: "EQ-${m['id'] ?? 'SS'}",
-                designation: "Parc matériel $siteName",
-                type: "Extincteurs & Bacs",
-                site: siteName,
-                location: "Station complète",
-                lastControlDate: controlDate,
-                nextDueDate: "16 Nov 2026",
-                status: isConforme ? 'Conforme' : 'Non-conforme',
-                pressureStatus: isConforme ? "Normal" : "Anomalie",
-                conformity: isConforme,
-                value: 1,
-                valueType: "number",
-                attachments: const [],
-              ));
-            }
+            parsed.add(EquipmentMonitoringData.fromJson(m));
           }
 
-          if (parsedItems.isNotEmpty) {
-            await OfflineStorageService.cacheEquipments(parsedItems);
-            return _filterList(parsedItems, search, category);
+          if (parsed.isNotEmpty) {
+            await OfflineStorageService.cacheEquipmentMonitorings(parsed);
+            return _filterMonitorings(parsed, search, status);
           }
         }
       }
     } catch (e) {
-      debugPrint('[EquipmentService] Erreur lecture API: $e');
+      debugPrint('[EquipmentService] Erreur lecture API getMonitorings: $e');
     }
 
     // 2. Repli hors-ligne depuis le cache local
+    final cached = await OfflineStorageService.getCachedEquipmentMonitorings();
+    if (cached.isNotEmpty) {
+      return _filterMonitorings(cached, search, status);
+    }
+
+    // 3. Initialisation avec les données par défaut si premier lancement
+    await OfflineStorageService.cacheEquipmentMonitorings(_defaultMonitorings);
+    return _filterMonitorings(_defaultMonitorings, search, status);
+  }
+
+  /// Récupère les détails complets d'une session de suivi par son ID
+  static Future<EquipmentMonitoringData?> getMonitoringById(dynamic id) async {
+    try {
+      await ApiClient.ensureAuthenticated();
+      final response = await ApiClient.dio.get('/home/equipments-monitoring/equipments/$id');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] ?? response.data;
+        final monitoring = EquipmentMonitoringData.fromJson(Map<String, dynamic>.from(data));
+        await OfflineStorageService.updateCachedEquipmentMonitoring(monitoring);
+        return monitoring;
+      }
+    } catch (_) {}
+
+    final cached = await OfflineStorageService.getCachedEquipmentMonitorings();
+    final match = cached.where((m) => m.id?.toString() == id?.toString() || m.reference == id?.toString());
+    if (match.isNotEmpty) return match.first;
+    return null;
+  }
+
+  /// Création / Planification d'une nouvelle session de suivi matériel (0 équipement à la création)
+  static Future<EquipmentMonitoringData> createMonitoring({
+    required String siteName,
+    required String date,
+    required String status,
+    String? inspector,
+    String? observations,
+  }) async {
+    final tempId = DateTime.now().millisecondsSinceEpoch;
+    final now = DateTime.now();
+    final defaultInspector = inspector ?? ApiClient.currentUser?['name']?.toString() ?? 'Inspecteur HSSE';
+
+    EquipmentMonitoringData newMonitoring = EquipmentMonitoringData(
+      id: tempId,
+      reference: '#EQ-$tempId',
+      siteName: siteName,
+      date: date,
+      status: status,
+      rawStatus: status == 'Planifiée' ? 'DRAFT' : 'IN_PROGRESS',
+      inspector: defaultInspector,
+      conformityRate: 100.0,
+      initialConformityRate: 100.0,
+      observations: observations,
+      items: const [],
+      isPendingSync: true,
+    );
+
+    // 1. Sauvegarde locale immédiate (mode hors-ligne garanti)
+    await OfflineStorageService.addCachedEquipmentMonitoring(newMonitoring);
+
+    // 2. Synchronisation en ligne
+    try {
+      await ApiClient.ensureAuthenticated();
+      final response = await ApiClient.dio.post(
+        '/home/equipments-monitoring/equipments',
+        data: {
+          'site_name': siteName,
+          'date': date,
+          'status': status == 'Planifiée' ? 'DRAFT' : 'IN_PROGRESS',
+          'observations': observations,
+          'items': [],
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final serverData = response.data['data'] ?? response.data;
+        final serverId = serverData['id'] ?? response.data['id'];
+        if (serverId != null) {
+          newMonitoring = newMonitoring.copyWith(
+            id: serverId,
+            reference: '#EQ-$serverId',
+            isPendingSync: false,
+          );
+          await OfflineStorageService.updateCachedEquipmentMonitoring(newMonitoring);
+        }
+      }
+    } catch (e) {
+      debugPrint('[EquipmentService] Enregistrement suivi en ligne échoué, mise en file sync: $e');
+      final action = SyncAction(
+        id: 'monitoring_create_$tempId',
+        type: 'EQUIPMENT_MONITORING_CREATE',
+        title: 'Création suivi matériel ($siteName)',
+        endpoint: '/home/equipments-monitoring/equipments',
+        method: 'POST',
+        payload: {
+          'site_name': siteName,
+          'date': date,
+          'status': status == 'Planifiée' ? 'DRAFT' : 'IN_PROGRESS',
+          'observations': observations,
+          'items': [],
+        },
+        createdAt: now,
+      );
+      await SyncService.instance.queueAction(action);
+    }
+
+    return newMonitoring;
+  }
+
+  /// Mise à jour du statut d'une session de suivi matériel
+  static Future<EquipmentMonitoringData?> updateMonitoringStatus(
+    dynamic monitoringId,
+    String newStatus,
+  ) async {
+    final cached = await OfflineStorageService.getCachedEquipmentMonitorings();
+    final idx = cached.indexWhere((m) =>
+        m.id?.toString() == monitoringId?.toString() || m.reference == monitoringId?.toString());
+    if (idx == -1) return null;
+
+    String raw = 'IN_PROGRESS';
+    if (newStatus == 'Clôturée') raw = 'COMPLETED';
+    if (newStatus == 'Planifiée') raw = 'DRAFT';
+    if (newStatus == 'Annulée') raw = 'CANCELLED';
+
+    final updated = cached[idx].copyWith(
+      status: newStatus,
+      rawStatus: raw,
+    );
+    await OfflineStorageService.updateCachedEquipmentMonitoring(updated);
+
+    try {
+      await ApiClient.ensureAuthenticated();
+      await ApiClient.dio.put(
+        '/home/equipments-monitoring/equipments/$monitoringId',
+        data: {'status': raw},
+      );
+    } catch (e) {
+      final action = SyncAction(
+        id: 'monitoring_status_${monitoringId}_${DateTime.now().millisecondsSinceEpoch}',
+        type: 'EQUIPMENT_MONITORING_UPDATE',
+        title: 'Mise à jour statut suivi ${updated.reference} ($newStatus)',
+        endpoint: '/home/equipments-monitoring/equipments/$monitoringId',
+        method: 'PUT',
+        payload: {'status': raw},
+        createdAt: DateTime.now(),
+      );
+      await SyncService.instance.queueAction(action);
+    }
+
+    return updated;
+  }
+
+  /// Ajout d'un matériel sur site pendant l'inspection (contrôle unitaire, sans saisie de quantité)
+  static Future<EquipmentItemData> addItemToMonitoring(
+    dynamic monitoringId, {
+    required String name,
+    required String type,
+    required bool isConforme,
+    String? location,
+    String? comment,
+    List<String>? photoPaths,
+  }) async {
+    final now = DateTime.now();
+    final tempTag = "EQ-${now.millisecondsSinceEpoch.toString().substring(7)}";
+    final dateStr = "${now.day} Oct ${now.year}";
+
+    EquipmentItemData newItem = EquipmentItemData(
+      monitoringId: monitoringId,
+      tagNumber: tempTag,
+      designation: name,
+      type: formatEquipmentType(type),
+      site: '',
+      location: (location != null && location.trim().isNotEmpty) ? location : "Piste distribution",
+      lastControlDate: dateStr,
+      nextDueDate: "${now.day} Nov ${now.year}",
+      status: isConforme ? "Conforme" : "Non-conforme",
+      pressureStatus: isConforme ? "Normal (14 bars)" : "Contrôle requis",
+      conformity: isConforme,
+      attachments: photoPaths ?? const [],
+      comment: comment,
+    );
+
+    // 1. Sauvegarde locale immédiate
+    await OfflineStorageService.addItemToMonitoringInCache(monitoringId, newItem);
+
+    // 2. Synchronisation en ligne
+    try {
+      await ApiClient.ensureAuthenticated();
+      final response = await ApiClient.dio.post(
+        '/home/equipments-monitoring/equipments/$monitoringId/items',
+        data: {
+          'name': name,
+          'type': type,
+          'conformity': isConforme,
+          'location': location,
+          'comment': comment,
+        },
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final serverItem = response.data['item'];
+        final serverId = serverItem?['id'] is int
+            ? serverItem['id']
+            : int.tryParse(serverItem?['id']?.toString() ?? '');
+
+        if (serverId != null) {
+          newItem = newItem.copyWith(id: serverId, tagNumber: "EQ-$serverId");
+
+          if (photoPaths != null && photoPaths.isNotEmpty) {
+            final List<String> remoteUrls = [];
+            for (final p in photoPaths) {
+              final file = File(p);
+              if (await file.exists()) {
+                final url = await uploadItemPhoto(serverId, file);
+                if (url != null) remoteUrls.add(url);
+              }
+            }
+            if (remoteUrls.isNotEmpty) {
+              newItem = newItem.copyWith(attachments: remoteUrls);
+            }
+          }
+          await OfflineStorageService.updateItemInMonitoringInCache(monitoringId, newItem);
+        }
+      }
+    } catch (e) {
+      debugPrint('[EquipmentService] Ajout item en ligne échoué, mise en file sync: $e');
+      final action = SyncAction(
+        id: 'equipment_item_add_${DateTime.now().millisecondsSinceEpoch}',
+        type: 'EQUIPMENT_ITEM_ADD',
+        title: 'Ajout matériel $name',
+        endpoint: '/home/equipments-monitoring/equipments/$monitoringId/items',
+        method: 'POST',
+        payload: {
+          'name': name,
+          'type': type,
+          'conformity': isConforme,
+          'location': location,
+          'comment': comment,
+        },
+        createdAt: DateTime.now(),
+      );
+      await SyncService.instance.queueAction(action);
+    }
+
+    return newItem;
+  }
+
+  /// Mise à jour de la conformité d'un matériel (toggle en direct sur le terrain)
+  static Future<EquipmentItemData> updateItemConformity(
+    dynamic monitoringId,
+    EquipmentItemData item,
+    bool newConformity, {
+    String? comment,
+    List<String>? newPhotoPaths,
+  }) async {
+    final updatedPhotos = List<String>.from(item.attachments);
+    if (newPhotoPaths != null) {
+      updatedPhotos.addAll(newPhotoPaths);
+    }
+
+    final updated = item.copyWith(
+      lastControlDate: "Aujourd'hui (${DateTime.now().day} Oct ${DateTime.now().year})",
+      status: newConformity ? "Conforme" : "Non-conforme",
+      conformity: newConformity,
+      pressureStatus: newConformity ? "Normal (14 bars)" : "Pression anormale",
+      attachments: updatedPhotos,
+      comment: comment ?? item.comment,
+    );
+
+    // 1. Sauvegarde locale
+    await OfflineStorageService.updateItemInMonitoringInCache(monitoringId, updated);
+
+    // 2. Synchronisation en ligne si itemId disponible
+    if (item.id != null) {
+      try {
+        await ApiClient.ensureAuthenticated();
+        await ApiClient.dio.put(
+          '/home/equipments-monitoring/equipments/items/${item.id}',
+          data: {
+            'conformity': newConformity,
+            'comment': comment ?? item.comment,
+          },
+        );
+
+        if (newPhotoPaths != null && newPhotoPaths.isNotEmpty) {
+          for (final photoPath in newPhotoPaths) {
+            final file = File(photoPath);
+            if (await file.exists()) {
+              final remoteUrl = await uploadItemPhoto(item.id!, file);
+              if (remoteUrl != null) {
+                final idx = updatedPhotos.indexOf(photoPath);
+                if (idx != -1) {
+                  updatedPhotos[idx] = remoteUrl;
+                }
+              }
+            }
+          }
+          await OfflineStorageService.updateItemInMonitoringInCache(
+            monitoringId,
+            updated.copyWith(attachments: updatedPhotos),
+          );
+        }
+      } catch (err) {
+        final action = SyncAction(
+          id: 'equipment_item_update_${item.id}_${DateTime.now().millisecondsSinceEpoch}',
+          type: 'EQUIPMENT_ITEM_UPDATE',
+          title: 'Contrôle ${item.designation} (${newConformity ? 'Conforme' : 'Non-conforme'})',
+          endpoint: '/home/equipments-monitoring/equipments/items/${item.id}',
+          method: 'PUT',
+          payload: {
+            'conformity': newConformity,
+            'comment': comment ?? item.comment,
+          },
+          createdAt: DateTime.now(),
+        );
+        await SyncService.instance.queueAction(action);
+      }
+    }
+
+    return updated;
+  }
+
+  /// Supprime un matériel d'une session de suivi
+  static Future<bool> deleteItemFromMonitoring(dynamic monitoringId, EquipmentItemData item) async {
+    await OfflineStorageService.deleteItemFromMonitoringInCache(monitoringId, item.id, item.tagNumber);
+
+    if (item.id != null) {
+      try {
+        await ApiClient.ensureAuthenticated();
+        await ApiClient.dio.delete('/home/equipments-monitoring/equipments/items/${item.id}');
+        return true;
+      } catch (e) {
+        debugPrint('[EquipmentService] Erreur suppression en ligne: $e');
+        final action = SyncAction(
+          id: 'equipment_delete_${item.id}_${DateTime.now().millisecondsSinceEpoch}',
+          type: 'EQUIPMENT_ITEM_DELETE',
+          title: 'Suppression matériel ${item.designation}',
+          endpoint: '/home/equipments-monitoring/equipments/items/${item.id}',
+          method: 'DELETE',
+          payload: const {},
+          createdAt: DateTime.now(),
+        );
+        await SyncService.instance.queueAction(action);
+      }
+    }
+    return true;
+  }
+
+  /// Récupère la liste des équipements (pour compatibilité avec Dashboard)
+  static Future<List<EquipmentItemData>> getEquipments({
+    String? search,
+    String? category,
+  }) async {
+    final monitorings = await getMonitorings();
+    final List<EquipmentItemData> allItems = [];
+    for (final m in monitorings) {
+      for (final it in m.items) {
+        allItems.add(it.copyWith(site: m.siteName));
+      }
+    }
+    if (allItems.isNotEmpty) {
+      return _filterList(allItems, search, category);
+    }
+
     final cached = await OfflineStorageService.getCachedEquipments();
     if (cached.isNotEmpty) {
       return _filterList(cached, search, category);
     }
 
-    // 3. Premier démarrage : initialisation des données par défaut
     await OfflineStorageService.cacheEquipments(_defaultEquipments);
     return _filterList(_defaultEquipments, search, category);
   }
 
-  static String _formatEquipmentType(String? rawType) {
+  static String formatEquipmentType(String? rawType) {
     if (rawType == null) return 'Extincteur P50';
     final t = rawType.toLowerCase();
     if (t.contains('p50')) return 'Extincteur P50';
     if (t.contains('p9')) return 'Extincteur P9';
+    if (t.contains('p6')) return 'Extincteur P6';
+    if (t.contains('co2')) return 'Extincteur CO2';
     if (t.contains('ria')) return 'RIA';
     if (t.contains('bac')) return 'Cuves & Bacs';
+    if (t.contains('poubelle')) return 'Déchets & Poubelles';
+    if (t.contains('caf') || t.contains('caisse')) return 'Sécurité Incendie';
+    if (t.contains('picto') || t.contains('panneau') || t.contains('signal')) return 'Signalétique';
     if (t.contains('extincteur')) return 'Extincteur P50';
     return rawType;
   }
 
-  static List<EquipmentItemData> _filterList(
-    List<EquipmentItemData> list,
-    String? search,
-    String? category,
-  ) {
-    return list.where((item) {
-      if (search != null && search.trim().isNotEmpty) {
-        final q = search.toLowerCase();
-        final match = item.tagNumber.toLowerCase().contains(q) ||
-            item.designation.toLowerCase().contains(q) ||
-            item.site.toLowerCase().contains(q) ||
-            item.location.toLowerCase().contains(q);
-        if (!match) return false;
+  /// Récupère la liste des noms de sites / stations
+  static Future<List<String>> getSiteNames() async {
+    try {
+      await ApiClient.ensureAuthenticated();
+      final response = await ApiClient.dio.get('/home/equipments-monitoring/site-names');
+      if (response.statusCode == 200 && response.data != null) {
+        final List raw = response.data is List ? response.data : (response.data['data'] ?? []);
+        final names = raw.map<String>((e) => e['name']?.toString() ?? '').where((s) => s.isNotEmpty).toList();
+        if (names.isNotEmpty) return names;
       }
-      if (category != null && category.isNotEmpty && !category.toLowerCase().contains('tous')) {
-        return item.type.toLowerCase().contains(category.toLowerCase()) ||
-            category.toLowerCase().contains(item.type.toLowerCase());
-      }
-      return true;
-    }).toList();
+    } catch (_) {}
+    return const [
+      "Terminal Toamasina",
+      "Dépôt Antsirabe",
+      "Station Majunga",
+      "Dépôt Ivato",
+      "Station Tana Ankorondrano",
+      "Station Tamatave Port",
+      "Station Fianarantsoa",
+      "Station Tuléar Centre",
+    ];
   }
 
   /// Upload d'une photo d'équipement vers l'API
@@ -251,80 +757,46 @@ class EquipmentService {
     return null;
   }
 
-  /// Réalisation d'un contrôle équipement avec persistance hors-ligne et auto-synchro en ligne
-  static Future<EquipmentItemData> performControl(
-    EquipmentItemData equipment, {
-    required bool isConforme,
-    String? pressureStatus,
-    String? observation,
-    List<String>? newPhotoPaths,
-  }) async {
-    final updatedPhotos = List<String>.from(equipment.attachments);
-    if (newPhotoPaths != null) {
-      updatedPhotos.addAll(newPhotoPaths);
-    }
-
-    final updated = equipment.copyWith(
-      lastControlDate: "Aujourd'hui (${DateTime.now().day} Oct ${DateTime.now().year})",
-      status: isConforme ? "Conforme" : "Non-conforme",
-      conformity: isConforme,
-      pressureStatus: pressureStatus ?? (isConforme ? "Normal (14 bars)" : "Pression anormale"),
-      attachments: updatedPhotos,
-      comment: observation ?? equipment.comment,
-    );
-
-    // 1. Sauvegarde locale hors-ligne immédiate
-    await OfflineStorageService.updateCachedEquipment(updated);
-
-    // 2. Synchronisation en ligne si itemId disponible
-    if (equipment.id != null) {
-      try {
-        await ApiClient.ensureAuthenticated();
-        await ApiClient.dio.put(
-          '/home/equipments-monitoring/equipments/items/${equipment.id}',
-          data: {
-            'conformity': isConforme,
-            'comment': observation,
-          },
-        );
-
-        // Upload des nouvelles photos s'il y en a
-        if (newPhotoPaths != null && newPhotoPaths.isNotEmpty) {
-          for (final photoPath in newPhotoPaths) {
-            final file = File(photoPath);
-            if (await file.exists()) {
-              final remoteUrl = await uploadItemPhoto(equipment.id!, file);
-              if (remoteUrl != null) {
-                // Remplace le chemin local par l'URL distante
-                final idx = updatedPhotos.indexOf(photoPath);
-                if (idx != -1) {
-                  updatedPhotos[idx] = remoteUrl;
-                }
-              }
-            }
-          }
-          await OfflineStorageService.updateCachedEquipment(
-            updated.copyWith(attachments: updatedPhotos),
-          );
-        }
-      } catch (err) {
-        // Enfilement offline sync
-        final action = SyncAction(
-          id: 'equipment_control_${equipment.id}_${DateTime.now().millisecondsSinceEpoch}',
-          type: 'EQUIPMENT_UPDATE',
-          title: 'Contrôle ${equipment.designation} (${isConforme ? 'Conforme' : 'Non-conforme'})',
-          endpoint: '/home/equipments-monitoring/equipments/items/${equipment.id}',
-          method: 'PUT',
-          payload: {
-            'conformity': isConforme,
-            'comment': observation,
-          },
-          createdAt: DateTime.now(),
-        );
-        await SyncService.instance.queueAction(action);
+  static List<EquipmentMonitoringData> _filterMonitorings(
+    List<EquipmentMonitoringData> list,
+    String? search,
+    String? status,
+  ) {
+    return list.where((item) {
+      if (search != null && search.trim().isNotEmpty) {
+        final q = search.toLowerCase();
+        final match = item.reference.toLowerCase().contains(q) ||
+            item.siteName.toLowerCase().contains(q) ||
+            item.inspector.toLowerCase().contains(q) ||
+            (item.observations?.toLowerCase().contains(q) ?? false);
+        if (!match) return false;
       }
-    }
+      if (status != null && status.isNotEmpty && !status.toLowerCase().contains('tous')) {
+        return item.status.toLowerCase() == status.toLowerCase();
+      }
+      return true;
+    }).toList();
+  }
 
-    return updated;
+  static List<EquipmentItemData> _filterList(
+    List<EquipmentItemData> list,
+    String? search,
+    String? category,
+  ) {
+    return list.where((item) {
+      if (search != null && search.trim().isNotEmpty) {
+        final q = search.toLowerCase();
+        final match = item.tagNumber.toLowerCase().contains(q) ||
+            item.designation.toLowerCase().contains(q) ||
+            item.site.toLowerCase().contains(q) ||
+            item.location.toLowerCase().contains(q);
+        if (!match) return false;
+      }
+      if (category != null && category.isNotEmpty && !category.toLowerCase().contains('tous')) {
+        return item.type.toLowerCase().contains(category.toLowerCase()) ||
+            category.toLowerCase().contains(item.type.toLowerCase());
+      }
+      return true;
+    }).toList();
   }
 }

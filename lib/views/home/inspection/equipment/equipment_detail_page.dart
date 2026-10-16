@@ -1,205 +1,299 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/camera_service.dart';
 import 'package:gestion_hsse/cores/services/equipment_service.dart';
-import 'package:gestion_hsse/cores/services/offline_storage_service.dart';
-import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
 
-
 class EquipmentDetailPage extends StatefulWidget {
+  final EquipmentMonitoringData? monitoring;
   final EquipmentItemData? equipment;
 
-  const EquipmentDetailPage({super.key, this.equipment});
+  const EquipmentDetailPage({
+    super.key,
+    this.monitoring,
+    this.equipment,
+  });
 
   @override
   State<EquipmentDetailPage> createState() => _EquipmentDetailPageState();
 }
 
 class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
-  late EquipmentItemData equipment;
-
-  // Points de contrôle visuel
-  bool sealIntact = true;
-  bool pinIntact = true;
-  bool hoseGood = true;
-  bool pressureOk = true;
-  bool accessibilityOk = true;
-  bool signageOk = true;
-
-  int photoCount = 0;
-  late List<Map<String, String>> inspectionHistory;
+  late EquipmentMonitoringData _monitoring;
+  bool _initialized = false;
+  String _selectedFilter = 'Tous'; // 'Tous', 'Conformes', 'Anomalies'
+  String? _selectedCategory; // category filter chip
 
   @override
   void initState() {
     super.initState();
-    equipment = widget.equipment ??
-        const EquipmentItemData(
-          tagNumber: "EXT-P50-01",
-          designation: "Extincteur 50kg Poudre sur roues",
-          type: "Extincteur P50",
-          site: "Terminal Pétrolier Toamasina",
-          location: "Zone Cuves Sud - Poste Chargement",
-          lastControlDate: "12 Oct 2026",
-          nextDueDate: "12 Nov 2026",
-          status: "Conforme",
-          pressureStatus: "Normal (14 bars)",
-        );
-
-    final isNonConforme =
-        equipment.status.toLowerCase().contains('non-conforme') ||
-        equipment.status.toLowerCase().contains('requis');
-    if (isNonConforme) {
-      pinIntact = false;
-      pressureOk = false;
+    if (widget.monitoring != null) {
+      _monitoring = widget.monitoring!;
+      _initialized = true;
+    } else if (widget.equipment != null) {
+      final e = widget.equipment!;
+      _monitoring = EquipmentMonitoringData(
+        id: e.monitoringId ?? e.id ?? 1,
+        reference: e.tagNumber,
+        siteName: e.site,
+        date: e.lastControlDate,
+        status: e.inspectionStatus,
+        inspector: "Inspecteur HSSE",
+        items: [e],
+      );
+      _initialized = true;
     }
-
-    inspectionHistory = [
-      {
-        "date": equipment.lastControlDate,
-        "inspector": "Jules Rakoto (Inspecteur HSSE)",
-        "type": "Contrôle Périodique Terrain",
-        "status": equipment.status,
-      },
-      {
-        "date": "14 Sep 2026",
-        "inspector": "Marie Razafi (Maintenance)",
-        "type": "Vérification Pression & Scellé",
-        "status": "Conforme",
-      },
-      {
-        "date": "15 Avr 2026",
-        "inspector": "Bureau Veritas Madagascar",
-        "type": "Audit Annuel & Poids de Charge",
-        "status": "Conforme Certifié",
-      },
-    ];
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    final args = ModalRoute.of(context)?.settings.arguments;
-    if (args is EquipmentItemData) {
+    if (!_initialized) {
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is EquipmentMonitoringData) {
+        setState(() {
+          _monitoring = args;
+          _initialized = true;
+        });
+      } else if (args is EquipmentItemData) {
+        setState(() {
+          _monitoring = EquipmentMonitoringData(
+            id: args.monitoringId ?? args.id ?? 1,
+            reference: args.tagNumber,
+            siteName: args.site,
+            date: args.lastControlDate,
+            status: args.inspectionStatus,
+            inspector: "Inspecteur HSSE",
+            items: [args],
+          );
+          _initialized = true;
+        });
+      } else {
+        // Fallback par défaut
+        setState(() {
+          _monitoring = const EquipmentMonitoringData(
+            id: 1,
+            reference: "#EQ-1",
+            siteName: "Station Majunga",
+            date: "16 Oct 2026",
+            status: "En cours",
+            inspector: "Jules Rakoto",
+            items: [],
+          );
+          _initialized = true;
+        });
+      }
+    }
+  }
+
+  Future<void> _refreshMonitoring() async {
+    final updated = await EquipmentService.getMonitoringById(_monitoring.id);
+    if (updated != null && mounted) {
       setState(() {
-        equipment = args;
-        final isNonConforme =
-            equipment.status.toLowerCase().contains('non-conforme') ||
-            equipment.status.toLowerCase().contains('requis');
-        if (isNonConforme) {
-          pinIntact = false;
-          pressureOk = false;
-        }
+        _monitoring = updated;
       });
     }
   }
 
-  void _showPhotoPickerSheet({required Function(String path) onPhotoSelected}) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (ctx) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  "Preuve photo de l'équipement",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.camera_alt, color: AppColors.primary),
-                  title: const Text("Prendre une photo (Appareil photo)"),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    final file = await CameraService.takePhoto();
-                    if (file != null) {
-                      onPhotoSelected(file.path);
-                    }
-                  },
-                ),
-                ListTile(
-                  leading: const Icon(Icons.photo_library, color: AppColors.primary),
-                  title: const Text("Choisir depuis la galerie"),
-                  onTap: () async {
-                    Navigator.pop(ctx);
-                    final file = await CameraService.pickFromGallery();
-                    if (file != null) {
-                      onPhotoSelected(file.path);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+  List<EquipmentItemData> get _filteredItems {
+    return _monitoring.items.where((it) {
+      if (_selectedFilter == 'Conformes' && !it.conformity) return false;
+      if (_selectedFilter == 'Anomalies' && it.conformity) return false;
+      if (_selectedCategory != null && _selectedCategory != 'Tous') {
+        if (it.type != _selectedCategory) return false;
+      }
+      return true;
+    }).toList();
   }
 
-  void _previewPhoto(String path) {
-    showDialog(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: const EdgeInsets.all(12),
-        child: Stack(
-          alignment: Alignment.topRight,
-          children: [
-            InteractiveViewer(
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: path.startsWith('http')
-                    ? Image.network(path, fit: BoxFit.contain)
-                    : Image.file(File(path), fit: BoxFit.contain),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.close, color: Colors.white, size: 28),
-              onPressed: () => Navigator.pop(ctx),
-            ),
-          ],
+  Color get _statusBgColor {
+    final s = _monitoring.status.toLowerCase();
+    if (s.contains('planifi') || s.contains('brouillon') || s == 'draft') {
+      return const Color(0xFFFEF3C7);
+    } else if (s.contains('cours') || s == 'in_progress') {
+      return const Color(0xFFDBEAFE);
+    } else if (s.contains('termin') || s.contains('clôtur') || s.contains('clotur') || s == 'completed') {
+      return const Color(0xFFDCFCE7);
+    } else if (s.contains('annul') || s == 'cancelled') {
+      return const Color(0xFFFEE2E2);
+    }
+    return const Color(0xFFF1F5F9);
+  }
+
+  Color get _statusTextColor {
+    final s = _monitoring.status.toLowerCase();
+    if (s.contains('planifi') || s.contains('brouillon') || s == 'draft') {
+      return const Color(0xFFB45309);
+    } else if (s.contains('cours') || s == 'in_progress') {
+      return const Color(0xFF1D4ED8);
+    } else if (s.contains('termin') || s.contains('clôtur') || s.contains('clotur') || s == 'completed') {
+      return const Color(0xFF15803D);
+    } else if (s.contains('annul') || s == 'cancelled') {
+      return const Color(0xFFB91C1C);
+    }
+    return const Color(0xFF475569);
+  }
+
+  Color get _complianceColor {
+    final rate = _monitoring.calculatedRate;
+    if (rate >= 90) return const Color(0xFF10B981);
+    if (rate >= 70) return const Color(0xFFF59E0B);
+    return const Color(0xFFEF4444);
+  }
+
+  void _changeStatus(String newStatus) async {
+    final updated = await EquipmentService.updateMonitoringStatus(_monitoring.id, newStatus);
+    if (updated != null && mounted) {
+      setState(() {
+        _monitoring = updated;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Statut du suivi mis à jour : $newStatus"),
+          backgroundColor: AppColors.primary,
+          duration: const Duration(seconds: 2),
         ),
+      );
+    }
+  }
+
+  void _toggleItemConformity(EquipmentItemData item) async {
+    final newConformity = !item.conformity;
+    final updatedItem = await EquipmentService.updateItemConformity(
+      _monitoring.id,
+      item,
+      newConformity,
+    );
+
+    final updatedItems = List<EquipmentItemData>.from(_monitoring.items);
+    final idx = updatedItems.indexWhere((i) =>
+        (item.id != null && i.id != null && i.id == item.id) || i.tagNumber == item.tagNumber);
+    if (idx != -1) {
+      updatedItems[idx] = updatedItem;
+    }
+
+    final total = updatedItems.length;
+    final confCount = updatedItems.where((i) => i.conformity).length;
+    final newRate = total > 0 ? (confCount / total) * 100.0 : 100.0;
+
+    setState(() {
+      _monitoring = _monitoring.copyWith(
+        items: updatedItems,
+        conformityRate: newRate,
+      );
+    });
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text("${item.designation} marqué ${newConformity ? 'Conforme ✓' : 'Non-conforme ⚠'}"),
+        backgroundColor: newConformity ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+        duration: const Duration(seconds: 1),
       ),
     );
   }
 
-  void _showPerformControlBottomSheet() {
-    final observationController = TextEditingController();
-    final List<String> newPhotoPaths = [];
+  void _deleteItem(EquipmentItemData item) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text("Supprimer ce matériel ?"),
+        content: Text("Voulez-vous retirer '${item.designation}' de cette session de contrôle ?"),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+            child: const Text("Supprimer", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      await EquipmentService.deleteItemFromMonitoring(_monitoring.id, item);
+      final updatedItems = List<EquipmentItemData>.from(_monitoring.items);
+      updatedItems.removeWhere((i) =>
+          (item.id != null && i.id != null && i.id == item.id) || i.tagNumber == item.tagNumber);
+
+      final total = updatedItems.length;
+      final confCount = updatedItems.where((i) => i.conformity).length;
+      final newRate = total > 0 ? (confCount / total) * 100.0 : 100.0;
+
+      setState(() {
+        _monitoring = _monitoring.copyWith(
+          items: updatedItems,
+          conformityRate: newRate,
+        );
+      });
+    }
+  }
+
+  void _addItemPhoto(EquipmentItemData item) async {
+    final path = await CameraService.pickImage(context);
+    if (path != null) {
+      final updatedItem = await EquipmentService.updateItemConformity(
+        _monitoring.id,
+        item,
+        item.conformity,
+        newPhotoPaths: [path],
+      );
+
+      final updatedItems = List<EquipmentItemData>.from(_monitoring.items);
+      final idx = updatedItems.indexWhere((i) =>
+          (item.id != null && i.id != null && i.id == item.id) || i.tagNumber == item.tagNumber);
+      if (idx != -1) {
+        updatedItems[idx] = updatedItem;
+      }
+      setState(() {
+        _monitoring = _monitoring.copyWith(items: updatedItems);
+      });
+    }
+  }
+
+  /// Bottom sheet d'ajout d'équipement unitaire sur le terrain (sans saisie de quantité)
+  void _showAddEquipmentSheet() {
+    final nameController = TextEditingController();
+    final locationController = TextEditingController(text: "Piste distribution");
+    final commentController = TextEditingController();
+    String selectedType = "Extincteur P50";
+    bool isConforme = true;
+    final List<String> localPhotos = [];
+
+    final types = const [
+      "Extincteur P50",
+      "Extincteur P9",
+      "Extincteur P6",
+      "Extincteur CO2",
+      "RIA",
+      "Cuves & Bacs",
+      "Matériel & Outils",
+      "Déchets & Poubelles",
+      "Sécurité Incendie",
+      "Signalétique",
+      "Autre / Divers",
+    ];
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) {
+      builder: (ctx) {
         return StatefulBuilder(
-          builder: (context, setModalState) {
-            final isCurrentlyAllConforme = pressureOk &&
-                pinIntact &&
-                sealIntact &&
-                hoseGood &&
-                signageOk &&
-                accessibilityOk;
-
+          builder: (ctx, setModalState) {
             return Container(
               constraints: BoxConstraints(
-                maxHeight: MediaQuery.of(context).size.height * 0.90,
+                maxHeight: MediaQuery.of(ctx).size.height * 0.90,
               ),
               padding: EdgeInsets.only(
                 left: 20,
                 right: 20,
                 top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
               ),
               decoration: const BoxDecoration(
                 color: Colors.white,
@@ -222,6 +316,8 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                         ),
                       ),
                       const SizedBox(height: 16),
+
+                      // Header
                       Row(
                         children: [
                           Container(
@@ -230,16 +326,16 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                               color: AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(12),
                             ),
-                            child: const Icon(Icons.fact_check,
-                                color: AppColors.primary, size: 22),
+                            child: const Icon(Icons.add_moderator_rounded,
+                                color: AppColors.primary, size: 24),
                           ),
                           const SizedBox(width: 12),
-                          Expanded(
+                          const Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
-                                  "Contrôle Mensuel de Sécurité",
+                                Text(
+                                  "Ajouter un matériel à contrôler",
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
@@ -247,9 +343,9 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                   ),
                                 ),
                                 Text(
-                                  "${equipment.tagNumber} • ${equipment.type}",
-                                  style: const TextStyle(
-                                    fontSize: 12,
+                                  "Contrôle unitaire sur le terrain (1 matériel = 1 unité)",
+                                  style: TextStyle(
+                                    fontSize: 11,
                                     color: AppColors.textSecondary,
                                   ),
                                 ),
@@ -258,168 +354,272 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 16),
                       const Divider(height: 1),
                       const SizedBox(height: 16),
+
+                      // 1. Nom / Désignation
                       const Text(
-                        "Grille de conformité terrain :",
+                        "Désignation du matériel *",
                         style: TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          fontSize: 13,
                           color: AppColors.textPrimary,
                         ),
                       ),
-                      const SizedBox(height: 8),
-
-                      _buildCheckTile(
-                        title:
-                            "1. Manomètre de pression dans la plage verte (14 bars)",
-                        value: pressureOk,
-                        onChanged: (val) =>
-                            setModalState(() => pressureOk = val ?? true),
-                      ),
-                      _buildCheckTile(
-                        title: "2. Goupille de sécurité engagée et non forcée",
-                        value: pinIntact,
-                        onChanged: (val) =>
-                            setModalState(() => pinIntact = val ?? true),
-                      ),
-                      _buildCheckTile(
-                        title: "3. Scellé de garantie plastique intact et daté",
-                        value: sealIntact,
-                        onChanged: (val) =>
-                            setModalState(() => sealIntact = val ?? true),
-                      ),
-                      _buildCheckTile(
-                        title:
-                            "4. Flexible, lance et buse en parfait état sans fissure",
-                        value: hoseGood,
-                        onChanged: (val) =>
-                            setModalState(() => hoseGood = val ?? true),
-                      ),
-                      _buildCheckTile(
-                        title:
-                            "5. Signalétique d'identification visible et classe ABC conforme",
-                        value: signageOk,
-                        onChanged: (val) =>
-                            setModalState(() => signageOk = val ?? true),
-                      ),
-                      _buildCheckTile(
-                        title:
-                            "6. Dégagement et accessibilité immédiate (rayon de 1m)",
-                        value: accessibilityOk,
-                        onChanged: (val) =>
-                            setModalState(() => accessibilityOk = val ?? true),
-                      ),
-
-                      // ==================== ALERTE EN CAS D'ANOMALIE ====================
-                      if (!isCurrentlyAllConforme) ...[
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFFEF2F2),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: const Color(0xFFFECACA)),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.warning_amber_rounded,
-                                  color: Color(0xFFDC2626), size: 20),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  "Anomalie détectée : L'équipement sera classé Non-conforme.",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF991B1B),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pushNamed(
-                                    context,
-                                    AppRoutes.correctiveAction,
-                                  );
-                                },
-                                child: const Text(
-                                  "Action",
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFFDC2626),
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-
-                      const SizedBox(height: 14),
-
-                      // Observation terrain
+                      const SizedBox(height: 6),
                       TextField(
-                        controller: observationController,
-                        maxLines: 2,
-                        decoration: const InputDecoration(
-                          hintText:
-                              "Remarques ou observations terrain (ex: scellé repositionné)...",
-                          prefixIcon: Icon(Icons.comment_outlined, size: 18),
+                        controller: nameController,
+                        decoration: InputDecoration(
+                          hintText: "Ex: Extincteur 50kg Poudre Îlot 1",
+                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
+                          prefixIcon: const Icon(Icons.build_circle_outlined, size: 20),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         ),
                       ),
-
                       const SizedBox(height: 14),
 
-                      // Preuves photos ajoutées
+                      // 2. Type & Emplacement
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Type d'équipement *",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                    border: Border.all(color: Colors.grey.shade300),
+                                  ),
+                                  child: DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      value: selectedType,
+                                      isExpanded: true,
+                                      items: types.map((t) {
+                                        return DropdownMenuItem(
+                                          value: t,
+                                          child: Text(t, style: const TextStyle(fontSize: 12)),
+                                        );
+                                      }).toList(),
+                                      onChanged: (val) {
+                                        if (val != null) setModalState(() => selectedType = val);
+                                      },
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  "Emplacement *",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                TextField(
+                                  controller: locationController,
+                                  decoration: InputDecoration(
+                                    hintText: "Ex: Piste, Boutique...",
+                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+
+                      // 3. Conformité
                       const Text(
-                        "Preuves photos du contrôle :",
+                        "Conformité constatée *",
                         style: TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          fontSize: 13,
                           color: AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setModalState(() => isConforme = true),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: isConforme ? const Color(0xFFDCFCE7) : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: isConforme ? const Color(0xFF16A34A) : Colors.grey.shade300,
+                                    width: isConforme ? 2 : 1,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.check_circle_rounded,
+                                      color: isConforme ? const Color(0xFF15803D) : Colors.grey.shade500,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "Conforme",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: isConforme ? const Color(0xFF15803D) : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: InkWell(
+                              onTap: () => setModalState(() => isConforme = false),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: !isConforme ? const Color(0xFFFEE2E2) : Colors.grey.shade100,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(
+                                    color: !isConforme ? const Color(0xFFDC2626) : Colors.grey.shade300,
+                                    width: !isConforme ? 2 : 1,
+                                  ),
+                                ),
+                                alignment: Alignment.center,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.warning_amber_rounded,
+                                      color: !isConforme ? const Color(0xFFB91C1C) : Colors.grey.shade500,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      "Non-conforme",
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: !isConforme ? const Color(0xFFB91C1C) : Colors.grey.shade700,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
 
-                      if (newPhotoPaths.isNotEmpty) ...[
+                      // 4. Observation
+                      const Text(
+                        "Observations / Anomalies",
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      TextField(
+                        controller: commentController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          hintText: "Ex: Pression OK, goupille vérifiée...",
+                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
+                      // 5. Photos
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            "Photos justificatives",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          TextButton.icon(
+                            onPressed: () async {
+                              final p = await CameraService.pickImage(ctx);
+                              if (p != null) {
+                                setModalState(() => localPhotos.add(p));
+                              }
+                            },
+                            icon: const Icon(Icons.add_a_photo_outlined, size: 16),
+                            label: const Text("Ajouter"),
+                          ),
+                        ],
+                      ),
+                      if (localPhotos.isNotEmpty) ...[
+                        const SizedBox(height: 6),
                         SizedBox(
-                          height: 72,
+                          height: 70,
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
-                            itemCount: newPhotoPaths.length,
-                            separatorBuilder: (context, index) => const SizedBox(width: 8),
-                            itemBuilder: (context, idx) {
-                              final p = newPhotoPaths[idx];
+                            itemCount: localPhotos.length,
+                            separatorBuilder: (_, _) => const SizedBox(width: 8),
+                            itemBuilder: (c, i) {
                               return Stack(
                                 children: [
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(10),
+                                    borderRadius: BorderRadius.circular(8),
                                     child: Image.file(
-                                      File(p),
-                                      width: 72,
-                                      height: 72,
+                                      File(localPhotos[i]),
+                                      width: 70,
+                                      height: 70,
                                       fit: BoxFit.cover,
                                     ),
                                   ),
                                   Positioned(
                                     top: 2,
                                     right: 2,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        setModalState(() {
-                                          newPhotoPaths.removeAt(idx);
-                                        });
-                                      },
+                                    child: InkWell(
+                                      onTap: () => setModalState(() => localPhotos.removeAt(i)),
                                       child: Container(
                                         padding: const EdgeInsets.all(2),
                                         decoration: const BoxDecoration(
                                           color: Colors.black54,
                                           shape: BoxShape.circle,
                                         ),
-                                        child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                        child: const Icon(Icons.close, color: Colors.white, size: 14),
                                       ),
                                     ),
                                   ),
@@ -428,126 +628,57 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                             },
                           ),
                         ),
-                        const SizedBox(height: 10),
                       ],
 
-                      Row(
-                        children: [
-                          OutlinedButton.icon(
-                            onPressed: () {
-                              _showPhotoPickerSheet(
-                                onPhotoSelected: (path) {
-                                  setModalState(() {
-                                    newPhotoPaths.add(path);
-                                  });
-                                },
+                      const SizedBox(height: 24),
+
+                      // Bouton Valider
+                      SizedBox(
+                        width: double.infinity,
+                        height: 48,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            final name = nameController.text.trim().isNotEmpty
+                                ? nameController.text.trim()
+                                : selectedType;
+
+                            final newItem = await EquipmentService.addItemToMonitoring(
+                              _monitoring.id,
+                              name: name,
+                              type: selectedType,
+                              isConforme: isConforme,
+                              location: locationController.text.trim(),
+                              comment: commentController.text.trim().isNotEmpty
+                                  ? commentController.text.trim()
+                                  : null,
+                              photoPaths: localPhotos,
+                            );
+
+                            final updatedItems = List<EquipmentItemData>.from(_monitoring.items);
+                            updatedItems.insert(0, newItem);
+                            final total = updatedItems.length;
+                            final confCount = updatedItems.where((i) => i.conformity).length;
+                            final newRate = total > 0 ? (confCount / total) * 100.0 : 100.0;
+
+                            setState(() {
+                              _monitoring = _monitoring.copyWith(
+                                items: updatedItems,
+                                conformityRate: newRate,
                               );
-                            },
-                            icon: const Icon(Icons.camera_alt, size: 16),
-                            label: Text(
-                              newPhotoPaths.isNotEmpty
-                                  ? "${newPhotoPaths.length} photo(s) ajoutée(s)"
-                                  : "Prendre / Ajouter photo",
-                              style: const TextStyle(fontSize: 12),
-                            ),
+                            });
+
+                            if (ctx.mounted) Navigator.pop(ctx);
+                          },
+                          icon: const Icon(Icons.check, color: Colors.white),
+                          label: const Text(
+                            "Enregistrer le matériel",
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.white),
                           ),
-                          const Spacer(),
-                          Text(
-                            isCurrentlyAllConforme
-                                ? "Statut : Conforme"
-                                : "Statut : Non-conforme",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: isCurrentlyAllConforme
-                                  ? const Color(0xFF15803D)
-                                  : const Color(0xFFB91C1C),
-                            ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                           ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 18),
-
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton(
-                              onPressed: () => Navigator.pop(context),
-                              child: const Text("Annuler"),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: isCurrentlyAllConforme
-                                    ? AppColors.primary
-                                    : const Color(0xFFDC2626),
-                                foregroundColor: Colors.white,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 13),
-                              ),
-                              icon: const Icon(Icons.check, size: 18),
-                              label: const Text(
-                                "Valider l'inspection",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                              onPressed: () async {
-                                final messenger = ScaffoldMessenger.of(context);
-                                Navigator.pop(context);
-                                final isAllConforme = pressureOk &&
-                                    pinIntact &&
-                                    sealIntact &&
-                                    hoseGood &&
-                                    signageOk &&
-                                    accessibilityOk;
-
-                                final updated = await EquipmentService.performControl(
-                                  equipment,
-                                  isConforme: isAllConforme,
-                                  pressureStatus: pressureOk ? "Normal (14 bars)" : "Pression anormale",
-                                  observation: observationController.text.trim().isNotEmpty
-                                      ? observationController.text.trim()
-                                      : null,
-                                  newPhotoPaths: newPhotoPaths,
-                                );
-
-                                if (!mounted) return;
-                                setState(() {
-                                  equipment = updated;
-                                  inspectionHistory.insert(0, {
-                                    "date": "Aujourd'hui (${DateTime.now().day} Oct ${DateTime.now().year})",
-                                    "inspector": "Inspecteur HSSE Galana",
-                                    "type": "Contrôle Périodique Terrain",
-                                    "status": isAllConforme ? "Conforme" : "Non-conforme",
-                                  });
-                                });
-
-                                final isOnline = SyncService.instance.isOnline;
-                                messenger.showSnackBar(
-                                  SnackBar(
-                                    duration: const Duration(seconds: 4),
-                                    content: Row(
-                                      children: [
-                                        Icon(isOnline ? Icons.check_circle : Icons.cloud_off, color: Colors.white, size: 18),
-                                        const SizedBox(width: 8),
-                                        Expanded(
-                                          child: Text(
-                                            isOnline
-                                                ? "Contrôle de ${equipment.tagNumber} enregistré et synchronisé avec l'API Galana !"
-                                                : "Contrôle de ${equipment.tagNumber} enregistré en mode Hors-ligne ! Synchronisation automatique dès la reconnexion.",
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    backgroundColor: isAllConforme ? const Color(0xFF15803D) : const Color(0xFFDC2626),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ],
                   ),
@@ -560,74 +691,114 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
     );
   }
 
-  Widget _buildCheckTile({
-    required String title,
-    required bool value,
-    required ValueChanged<bool?> onChanged,
-  }) {
-    return CheckboxListTile(
-      value: value,
-      onChanged: onChanged,
-      title: Text(title, style: const TextStyle(fontSize: 12, height: 1.3)),
-      controlAffinity: ListTileControlAffinity.leading,
-      dense: true,
-      activeColor: AppColors.primary,
-      contentPadding: EdgeInsets.zero,
+  void _showImageDialog(String path) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: path.startsWith('http')
+                  ? Image.network(path, fit: BoxFit.contain)
+                  : Image.file(File(path), fit: BoxFit.contain),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 28),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool isConforme = equipment.status.toLowerCase() == 'conforme';
+    final int total = _monitoring.totalEquipments;
+    final int conformes = _monitoring.conformeCount;
+    final int anomalies = _monitoring.anomalyCount;
+    final double rate = _monitoring.calculatedRate;
+    final items = _filteredItems;
+    final categoryCounts = _monitoring.categoryCounts;
 
-    return PopScope(
-      canPop: true,
-      onPopInvokedWithResult: (didPop, result) {},
-      child: Scaffold(
-        backgroundColor: AppColors.lightBackground,
-        appBar: AppBar(
-          leading: BackButton(
-            onPressed: () => Navigator.pop(context, equipment),
-          ),
-          title: Text(equipment.tagNumber),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.qr_code),
-              tooltip: "Vignette de contrôle",
-              onPressed: () {
-                _showVignetteDialog();
-              },
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
+      appBar: AppBar(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _monitoring.siteName,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
-            IconButton(
-              icon: const Icon(Icons.share_outlined),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Exportation de la fiche d'équipement..."),
-                    backgroundColor: AppColors.primary,
-                  ),
-                );
-              },
+            Text(
+              "${_monitoring.reference} • ${_monitoring.date}",
+              style: const TextStyle(fontSize: 11, color: Colors.white70),
             ),
           ],
         ),
-        body: SingleChildScrollView(
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh_rounded),
+            onPressed: _refreshMonitoring,
+            tooltip: "Actualiser",
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert_rounded),
+            onSelected: (val) {
+              if (val == 'Planifiée' || val == 'En cours' || val == 'Clôturée' || val == 'Annulée') {
+                _changeStatus(val);
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                enabled: false,
+                child: Text("Changer le statut :", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              ),
+              const PopupMenuItem(value: 'Planifiée', child: Text("Planifiée")),
+              const PopupMenuItem(value: 'En cours', child: Text("En cours")),
+              const PopupMenuItem(value: 'Clôturée', child: Text("Clôturer le suivi")),
+              const PopupMenuItem(value: 'Annulée', child: Text("Annuler")),
+            ],
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAddEquipmentSheet,
+        backgroundColor: AppColors.primary,
+        icon: const Icon(Icons.add_rounded, color: Colors.white),
+        label: const Text(
+          "Ajouter un matériel",
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        ),
+      ),
+      body: RefreshIndicator(
+        onRefresh: _refreshMonitoring,
+        color: AppColors.primary,
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ==================== HERO CARD ====================
+              // ==================== 1. EN-TÊTE SESSION DE CONTRÔLE ====================
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   color: Colors.white,
-                  borderRadius: BorderRadius.circular(24),
+                  borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: AppColors.border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
                     ),
                   ],
                 ),
@@ -635,626 +806,528 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: const Icon(
-                            Icons.fire_extinguisher,
-                            size: 32,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                        const SizedBox(width: 14),
+                        const Icon(Icons.location_on_rounded, color: AppColors.primary, size: 20),
+                        const SizedBox(width: 8),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                equipment.tagNumber,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                equipment.designation,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            _monitoring.siteName,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E293B),
+                            ),
                           ),
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isConforme
-                                ? const Color(0xFFDCFCE7)
-                                : const Color(0xFFFEE2E2),
-                            borderRadius: BorderRadius.circular(20),
+                            color: _statusBgColor,
+                            borderRadius: BorderRadius.circular(12),
                           ),
                           child: Text(
-                            equipment.status,
+                            _monitoring.status,
                             style: TextStyle(
-                              fontSize: 11,
+                              fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: isConforme
-                                  ? const Color(0xFF15803D)
-                                  : const Color(0xFFB91C1C),
+                              color: _statusTextColor,
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
-                    const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                    const SizedBox(height: 14),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
-                        const Icon(Icons.location_on,
-                            size: 16, color: AppColors.primary),
-                        const SizedBox(width: 6),
+                        const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          _monitoring.inspector,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        ),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Text(
+                          _monitoring.date,
+                          style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                    if (_monitoring.observations != null && _monitoring.observations!.trim().isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        _monitoring.observations!,
+                        style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF475569)),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 16),
+
+              // ==================== 2. SCORECARD DE CONFORMITÉ & CATÉGORIES ====================
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Taux de conformité global",
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+                        ),
+                        Text(
+                          total > 0 ? "${rate.toStringAsFixed(0)}%" : "N/A",
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: _complianceColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: LinearProgressIndicator(
+                        value: total > 0 ? rate / 100.0 : 0.0,
+                        backgroundColor: const Color(0xFFF1F5F9),
+                        valueColor: AlwaysStoppedAnimation<Color>(_complianceColor),
+                        minHeight: 8,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Badges de comptage
+                    Row(
+                      children: [
                         Expanded(
-                          child: Text(
-                            "${equipment.site} • ${equipment.location}",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: const Color(0xFFE2E8F0)),
+                            ),
+                            child: Column(
+                              children: [
+                                Text("$total", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                                const Text("Matériels", style: TextStyle(fontSize: 10, color: Color(0xFF64748B))),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFDCFCE7),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Column(
+                              children: [
+                                Text("✓ $conformes",
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Color(0xFF15803D))),
+                                const Text("Conformes", style: TextStyle(fontSize: 10, color: Color(0xFF15803D))),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            decoration: BoxDecoration(
+                              color: anomalies > 0 ? const Color(0xFFFEE2E2) : const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: anomalies > 0 ? const Color(0xFFFCA5A5) : const Color(0xFFE2E8F0),
+                              ),
+                            ),
+                            child: Column(
+                              children: [
+                                Text("⚠ $anomalies",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                      color: anomalies > 0 ? const Color(0xFFB91C1C) : const Color(0xFF64748B),
+                                    )),
+                                Text(
+                                  "Anomalies",
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: anomalies > 0 ? const Color(0xFFB91C1C) : const Color(0xFF64748B),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
                       ],
                     ),
+
+                    // Répartition par catégorie (comptage dynamique count())
+                    if (categoryCounts.isNotEmpty) ...[
+                      const SizedBox(height: 14),
+                      const Text(
+                        "Inventaire contrôlé par type :",
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: categoryCounts.entries.map((entry) {
+                          final isCatSelected = _selectedCategory == entry.key;
+                          return InkWell(
+                            onTap: () {
+                              setState(() {
+                                if (_selectedCategory == entry.key) {
+                                  _selectedCategory = null;
+                                } else {
+                                  _selectedCategory = entry.key;
+                                }
+                              });
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: isCatSelected ? AppColors.primary : const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: isCatSelected ? AppColors.primary : const Color(0xFFCBD5E1),
+                                ),
+                              ),
+                              child: Text(
+                                "${entry.value} ${entry.key}",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isCatSelected ? Colors.white : const Color(0xFF334155),
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
                   ],
                 ),
               ),
 
               const SizedBox(height: 20),
 
-              // ==================== CARACTÉRISTIQUES TECHNIQUES ====================
-              const Text(
-                "Spécifications Techniques",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    _buildSpecRow("Type d'équipement", equipment.type),
-                    _buildDivider(),
-                    _buildSpecRow("Numéro de série", "SN-2021-GLN-0498"),
-                    _buildDivider(),
-                    _buildSpecRow("Fabricant / Marque", "Desautel Sécurité"),
-                    _buildDivider(),
-                    _buildSpecRow("Date de mise en service", "15/04/2021"),
-                    _buildDivider(),
-                    _buildSpecRow("Pression nominale", equipment.pressureStatus),
-                    _buildDivider(),
-                    _buildSpecRow(
-                        "Dernière inspection", equipment.lastControlDate),
-                    _buildDivider(),
-                    _buildSpecRow("Prochaine échéance", equipment.nextDueDate),
-                    _buildDivider(),
-                    _buildSpecRow("Épreuve décennale", "15/04/2031"),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ==================== POINTS DE CONTRÔLE RÉCENTS ====================
-              const Text(
-                "Points de Contrôle de Sécurité",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: [
-                    _buildStatusItem(
-                      title: "Manomètre de pression",
-                      desc: pressureOk
-                          ? "Aiguille dans la zone verte (14 bars)"
-                          : "Pression anormale détectée",
-                      isOk: pressureOk,
-                    ),
-                    _buildDivider(),
-                    _buildStatusItem(
-                      title: "Goupille de déclenchement",
-                      desc: pinIntact
-                          ? "En place, non déformée"
-                          : "Goupille absente ou forcée",
-                      isOk: pinIntact,
-                    ),
-                    _buildDivider(),
-                    _buildStatusItem(
-                      title: "Scellé de sécurité",
-                      desc: sealIntact
-                          ? "Plastique intact d'origine Galana"
-                          : "Scellé rompu",
-                      isOk: sealIntact,
-                    ),
-                    _buildDivider(),
-                    _buildStatusItem(
-                      title: "Flexible & Tromblon",
-                      desc: hoseGood
-                          ? "Caoutchouc souple sans craquelure"
-                          : "Fissure détectée",
-                      isOk: hoseGood,
-                    ),
-                    _buildDivider(),
-                    _buildStatusItem(
-                      title: "Panneau & Signalétique",
-                      desc: signageOk
-                          ? "Visible et identifié classe ABC"
-                          : "Signalétique absente",
-                      isOk: signageOk,
-                    ),
-                    _buildDivider(),
-                    _buildStatusItem(
-                      title: "Accessibilité physique",
-                      desc: accessibilityOk
-                          ? "Zone dégagée sans encombrement"
-                          : "Accès encombré",
-                      isOk: accessibilityOk,
-                    ),
-                  ],
-                ),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ==================== PREUVES PHOTOS ATTACHÉES ====================
+              // ==================== 3. SECTION MATÉRIELS CONTRÔLÉS ====================
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Text(
+                    "Matériels contrôlés (${items.length})",
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF1E293B),
+                    ),
+                  ),
+
+                  // Filtres Conforme / Anomalie
                   Row(
                     children: [
-                      const Icon(Icons.photo_camera, size: 20, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        "Preuves Photos (${equipment.attachments.length})",
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
+                      _buildFilterPill("Tous"),
+                      const SizedBox(width: 4),
+                      _buildFilterPill("Conformes"),
+                      const SizedBox(width: 4),
+                      _buildFilterPill("Anomalies"),
                     ],
-                  ),
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      minimumSize: Size.zero,
-                    ),
-                    onPressed: () {
-                      _showPhotoPickerSheet(
-                        onPhotoSelected: (path) async {
-                          final updated = equipment.copyWith(
-                            attachments: [...equipment.attachments, path],
-                          );
-                          setState(() {
-                            equipment = updated;
-                          });
-                          await OfflineStorageService.updateCachedEquipment(updated);
-                          if (equipment.id != null) {
-                            EquipmentService.uploadItemPhoto(equipment.id!, File(path));
-                          }
-                        },
-                      );
-                    },
-                    icon: const Icon(Icons.add_a_photo, size: 14),
-                    label: const Text("Ajouter", style: TextStyle(fontSize: 12)),
                   ),
                 ],
               ),
+
               const SizedBox(height: 12),
-              if (equipment.attachments.isEmpty)
+
+              // Liste des équipements
+              if (items.isEmpty)
                 Container(
                   width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: AppColors.border),
                   ),
                   child: Column(
                     children: [
-                      Icon(Icons.add_photo_alternate_outlined, size: 36, color: Colors.grey.shade400),
-                      const SizedBox(height: 6),
+                      Icon(Icons.inventory_2_outlined, size: 44, color: Colors.grey.shade400),
+                      const SizedBox(height: 10),
                       const Text(
-                        "Aucune photo enregistrée pour cet équipement",
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        "Aucun matériel dans cette session",
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      const SizedBox(height: 4),
+                      const Text(
+                        "Ajoutez les équipements présents sur place pour démarrer votre contrôle unitaire.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: _showAddEquipmentSheet,
+                        icon: const Icon(Icons.add, size: 18, color: Colors.white),
+                        label: const Text(
+                          "Ajouter un matériel",
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
                       ),
                     ],
                   ),
                 )
               else
-                SizedBox(
-                  height: 96,
-                  child: ListView.separated(
-                    scrollDirection: Axis.horizontal,
-                    itemCount: equipment.attachments.length,
-                    separatorBuilder: (context, index) => const SizedBox(width: 10),
-                    itemBuilder: (context, idx) {
-                      final photoUrl = equipment.attachments[idx];
-                      return GestureDetector(
-                        onTap: () => _previewPhoto(photoUrl),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(14),
-                          child: Container(
-                            width: 96,
-                            height: 96,
-                            color: Colors.grey.shade100,
-                            child: photoUrl.startsWith('http')
-                                ? Image.network(photoUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image))
-                                : Image.file(File(photoUrl), fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image)),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
+                ListView.separated(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: items.length,
+                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                  itemBuilder: (ctx, idx) {
+                    final item = items[idx];
+                    return _buildEquipmentItemCard(item);
+                  },
                 ),
 
-              const SizedBox(height: 20),
-
-              // ==================== HISTORIQUE DES CONTRÔLES ====================
-              const Text(
-                "Historique des Inspections Terrain",
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Column(
-                  children: List.generate(inspectionHistory.length, (index) {
-                    final item = inspectionHistory[index];
-                    final isLast = index == inspectionHistory.length - 1;
-                    return Column(
-                      children: [
-                        _buildHistoryItem(
-                          date: item["date"] ?? "",
-                          inspector: item["inspector"] ?? "",
-                          type: item["type"] ?? "",
-                          status: item["status"] ?? "",
-                        ),
-                        if (!isLast) _buildDivider(),
-                      ],
-                    );
-                  }),
-                ),
-              ),
-
-              const SizedBox(height: 90),
+              const SizedBox(height: 80),
             ],
-          ),
-        ),
-        bottomSheet: Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: AppColors.border)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.05),
-                blurRadius: 10,
-                offset: const Offset(0, -3),
-              ),
-            ],
-          ),
-          child: SafeArea(
-            child: SizedBox(
-              width: double.infinity,
-              height: 50,
-              child: ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text(
-                  "Réaliser un Contrôle Terrain",
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                ),
-                onPressed: _showPerformControlBottomSheet,
-              ),
-            ),
           ),
         ),
       ),
     );
   }
 
-  void _showVignetteDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.verified, color: AppColors.primary, size: 22),
-              ),
-              const SizedBox(width: 10),
-              const Text("Vignette de Contrôle", style: TextStyle(fontSize: 16)),
-            ],
+  Widget _buildFilterPill(String label) {
+    final isSelected = _selectedFilter == label;
+    return InkWell(
+      onTap: () => setState(() => _selectedFilter = label),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: isSelected ? AppColors.primary : Colors.grey.shade300),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: isSelected ? Colors.white : Colors.grey.shade700,
           ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEquipmentItemCard(EquipmentItemData item) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: item.conformity
+              ? AppColors.border.withValues(alpha: 0.8)
+              : const Color(0xFFFCA5A5),
+          width: item.conformity ? 1 : 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // En-tête : Nom + Bouton Toggle Conformité
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
-                ),
+              Expanded(
                 child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
-                      "GALANA RUBIS - CONTRÔLE HSSE",
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
-                        color: AppColors.primaryDark,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
                     Text(
-                      equipment.tagNumber,
+                      item.designation,
                       style: const TextStyle(
-                        fontSize: 20,
+                        fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      "Dernier contrôle : ${equipment.lastControlDate}",
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-                    ),
-                    Text(
-                      "Prochaine échéance : ${equipment.nextDueDate}",
-                      style: const TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Icon(Icons.qr_code, size: 80, color: AppColors.textPrimary),
-                    const SizedBox(height: 6),
-                    const Text(
-                      "Scannez pour consulter l'historique complet",
-                      style: TextStyle(fontSize: 10, color: AppColors.textSecondary),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            item.type,
+                            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF475569)),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        const Icon(Icons.location_on_outlined, size: 12, color: Color(0xFF94A3B8)),
+                        const SizedBox(width: 2),
+                        Flexible(
+                          child: Text(
+                            item.location,
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
               ),
+
+              // Bouton toggle conformité
+              InkWell(
+                onTap: () => _toggleItemConformity(item),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: item.conformity ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: item.conformity ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        item.conformity ? Icons.check_circle_rounded : Icons.warning_amber_rounded,
+                        size: 14,
+                        color: item.conformity ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        item.conformity ? "Conforme" : "Non-conforme",
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          color: item.conformity ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text("Fermer"),
-            ),
-            ElevatedButton.icon(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
+
+          // Observation
+          if (item.comment != null && item.comment!.trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(8),
               ),
-              onPressed: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text("Envoi vers l'imprimante thermique étiquettes..."),
-                    backgroundColor: AppColors.primary,
-                  ),
-                );
-              },
-              icon: const Icon(Icons.print, size: 16),
-              label: const Text("Imprimer étiquette"),
+              child: Text(
+                item.comment!,
+                style: const TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF475569)),
+              ),
             ),
           ],
-        );
-      },
-    );
-  }
 
-  Widget _buildSpecRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusItem({
-    required String title,
-    required String desc,
-    required bool isOk,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Icon(
-            isOk ? Icons.check_circle : Icons.cancel,
-            size: 18,
-            color: isOk ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  desc,
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-            decoration: BoxDecoration(
-              color: isOk ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(6),
-            ),
-            child: Text(
-              isOk ? "Conforme" : "Anomalie",
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: isOk ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
+          // Galerie Photos
+          if (item.attachments.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 55,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: item.attachments.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (ctx, pIdx) {
+                  final photoUrl = item.attachments[pIdx];
+                  return InkWell(
+                    onTap: () => _showImageDialog(photoUrl),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: photoUrl.startsWith('http')
+                          ? Image.network(photoUrl, width: 55, height: 55, fit: BoxFit.cover)
+                          : Image.file(File(photoUrl), width: 55, height: 55, fit: BoxFit.cover),
+                    ),
+                  );
+                },
               ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
+          ],
 
-  Widget _buildHistoryItem({
-    required String date,
-    required String inspector,
-    required String type,
-    required String status,
-  }) {
-    final isOk = status.toLowerCase().contains("conforme");
+          const SizedBox(height: 10),
+          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          const SizedBox(height: 6),
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 14,
-            backgroundColor: isOk ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
-            child: Icon(
-              isOk ? Icons.check : Icons.warning_amber,
-              size: 14,
-              color: isOk ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  type,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
+          // Actions du matériel (+ Photo, Supprimer)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              TextButton.icon(
+                onPressed: () => _addItemPhoto(item),
+                icon: const Icon(Icons.add_a_photo_outlined, size: 14),
+                label: const Text("Photo", style: TextStyle(fontSize: 11)),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  "$date • $inspector",
-                  style: const TextStyle(
-                    fontSize: 11,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-            decoration: BoxDecoration(
-              color: isOk ? const Color(0xFFDCFCE7) : const Color(0xFFFEE2E2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              status,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.bold,
-                color: isOk ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
               ),
-            ),
+              const SizedBox(width: 12),
+              TextButton.icon(
+                onPressed: () => _deleteItem(item),
+                icon: const Icon(Icons.delete_outline, size: 14, color: Color(0xFFEF4444)),
+                label: const Text("Retirer", style: TextStyle(fontSize: 11, color: Color(0xFFEF4444))),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ],
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildDivider() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
-      child: Divider(height: 1, color: Color(0xFFF1F5F9)),
     );
   }
 }

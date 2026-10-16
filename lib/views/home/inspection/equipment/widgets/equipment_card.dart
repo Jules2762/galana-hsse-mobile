@@ -10,6 +10,7 @@ class EquipmentCard extends StatelessWidget {
   final String lastControlDate;
   final String nextDueDate;
   final String status;
+  final String inspectionStatus;
   final String pressureStatus;
   final bool isPendingSync;
   final VoidCallback? onTap;
@@ -25,6 +26,7 @@ class EquipmentCard extends StatelessWidget {
     required this.lastControlDate,
     required this.nextDueDate,
     required this.status,
+    this.inspectionStatus = "En cours",
     this.pressureStatus = "Normal",
     this.isPendingSync = false,
     this.onTap,
@@ -66,11 +68,52 @@ class EquipmentCard extends StatelessWidget {
     }
   }
 
+  Color get _inspectionStatusBgColor {
+    switch (inspectionStatus.toLowerCase()) {
+      case 'terminée':
+      case 'clôturée':
+      case 'completed':
+        return const Color(0xFFDDF7E5);
+      case 'en cours':
+      case 'in_progress':
+        return const Color(0xFFE8F0FF);
+      case 'planifiée':
+      case 'draft':
+      case 'brouillon':
+        return const Color(0xFFF1F5F9);
+      default:
+        return const Color(0xFFF1F5F9);
+    }
+  }
+
+  Color get _inspectionStatusTextColor {
+    switch (inspectionStatus.toLowerCase()) {
+      case 'terminée':
+      case 'clôturée':
+      case 'completed':
+        return const Color(0xFF15803D);
+      case 'en cours':
+      case 'in_progress':
+        return const Color(0xFF1D4ED8);
+      case 'planifiée':
+      case 'draft':
+      case 'brouillon':
+        return const Color(0xFF64748B);
+      default:
+        return const Color(0xFF475569);
+    }
+  }
+
   IconData get _equipmentIcon {
-    if (type.contains('P50')) return Icons.fire_extinguisher;
-    if (type.contains('P9')) return Icons.fire_extinguisher_outlined;
-    if (type.contains('RIA')) return Icons.water_drop_outlined;
-    if (type.contains('Cuve') || type.contains('Bac')) return Icons.storage;
+    final t = type.toLowerCase();
+    if (t.contains('p50') || t.contains('p9') || t.contains('co2') || t.contains('extincteur')) {
+      return Icons.fire_extinguisher;
+    }
+    if (t.contains('ria')) return Icons.water_drop_outlined;
+    if (t.contains('cuve') || t.contains('bac')) return Icons.storage;
+    if (t.contains('poubelle') || t.contains('déchet')) return Icons.delete_outline;
+    if (t.contains('sécurité') || t.contains('caf') || t.contains('caisse')) return Icons.shield_outlined;
+    if (t.contains('signal') || t.contains('picto') || t.contains('panneau')) return Icons.warning_amber_rounded;
     return Icons.build_circle_outlined;
   }
 
@@ -160,6 +203,22 @@ class EquipmentCard extends StatelessWidget {
                         ),
                       ),
                     ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      margin: const EdgeInsets.only(right: 6),
+                      decoration: BoxDecoration(
+                        color: _inspectionStatusBgColor,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        inspectionStatus,
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: _inspectionStatusTextColor,
+                        ),
+                      ),
+                    ),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                       decoration: BoxDecoration(

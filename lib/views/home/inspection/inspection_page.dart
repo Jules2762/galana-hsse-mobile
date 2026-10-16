@@ -106,11 +106,11 @@ class _InspectionsPageState extends State<InspectionsPage>
 
                 // 3. SUIVI DU MATÉRIEL
                 EquipmentMonitoringListView(
-                  onEquipmentTap: (equipment) {
+                  onMonitoringTap: (monitoring) {
                     Navigator.pushNamed(
                       context,
                       AppRoutes.equipmentDetail,
-                      arguments: equipment,
+                      arguments: monitoring,
                     );
                   },
                 ),
