@@ -178,17 +178,7 @@ class OfflineStorageService {
   static Future<void> cacheEquipments(List<EquipmentItemData> items) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = items.map((item) => {
-        'tagNumber': item.tagNumber,
-        'designation': item.designation,
-        'type': item.type,
-        'site': item.site,
-        'location': item.location,
-        'lastControlDate': item.lastControlDate,
-        'nextDueDate': item.nextDueDate,
-        'status': item.status,
-        'pressureStatus': item.pressureStatus,
-      }).toList();
+      final list = items.map((item) => item.toJson()).toList();
       await prefs.setString(_keyEquipments, jsonEncode(list));
     } catch (e) {
       debugPrint('[OfflineStorage] Erreur cache Équipements: $e');
@@ -202,17 +192,7 @@ class OfflineStorageService {
       final raw = prefs.getString(_keyEquipments);
       if (raw != null && raw.isNotEmpty) {
         final List list = jsonDecode(raw);
-        return list.map((json) => EquipmentItemData(
-          tagNumber: json['tagNumber'] ?? '',
-          designation: json['designation'] ?? '',
-          type: json['type'] ?? '',
-          site: json['site'] ?? '',
-          location: json['location'] ?? '',
-          lastControlDate: json['lastControlDate'] ?? '',
-          nextDueDate: json['nextDueDate'] ?? '',
-          status: json['status'] ?? 'Conforme',
-          pressureStatus: json['pressureStatus'] ?? '',
-        )).toList();
+        return list.map((json) => EquipmentItemData.fromJson(Map<String, dynamic>.from(json))).toList();
       }
     } catch (e) {
       debugPrint('[OfflineStorage] Erreur lecture Équipements en cache: $e');
@@ -224,11 +204,14 @@ class OfflineStorageService {
   static Future<void> updateCachedEquipment(EquipmentItemData updated) async {
     try {
       final items = await getCachedEquipments();
-      final index = items.indexWhere((item) => item.tagNumber == updated.tagNumber);
+      final index = items.indexWhere((item) {
+        if (updated.id != null && item.id != null) return item.id == updated.id;
+        return item.tagNumber == updated.tagNumber;
+      });
       if (index != -1) {
         items[index] = updated;
       } else {
-        items.add(updated);
+        items.insert(0, updated);
       }
       await cacheEquipments(items);
     } catch (_) {}

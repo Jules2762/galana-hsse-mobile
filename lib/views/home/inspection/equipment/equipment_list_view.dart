@@ -10,6 +10,7 @@ import 'package:gestion_hsse/views/home/inspection/widgets/inspection_filter_chi
 
 
 class EquipmentItemData {
+  final int? id;
   final String tagNumber;
   final String designation;
   final String type;
@@ -19,8 +20,14 @@ class EquipmentItemData {
   final String nextDueDate;
   final String status;
   final String pressureStatus;
+  final bool conformity;
+  final dynamic value;
+  final String valueType;
+  final List<String> attachments;
+  final String? comment;
 
   const EquipmentItemData({
+    this.id,
     required this.tagNumber,
     required this.designation,
     required this.type,
@@ -30,7 +37,88 @@ class EquipmentItemData {
     required this.nextDueDate,
     required this.status,
     required this.pressureStatus,
+    this.conformity = true,
+    this.value = 1,
+    this.valueType = "number",
+    this.attachments = const [],
+    this.comment,
   });
+
+  EquipmentItemData copyWith({
+    int? id,
+    String? tagNumber,
+    String? designation,
+    String? type,
+    String? site,
+    String? location,
+    String? lastControlDate,
+    String? nextDueDate,
+    String? status,
+    String? pressureStatus,
+    bool? conformity,
+    dynamic value,
+    String? valueType,
+    List<String>? attachments,
+    String? comment,
+  }) {
+    return EquipmentItemData(
+      id: id ?? this.id,
+      tagNumber: tagNumber ?? this.tagNumber,
+      designation: designation ?? this.designation,
+      type: type ?? this.type,
+      site: site ?? this.site,
+      location: location ?? this.location,
+      lastControlDate: lastControlDate ?? this.lastControlDate,
+      nextDueDate: nextDueDate ?? this.nextDueDate,
+      status: status ?? this.status,
+      pressureStatus: pressureStatus ?? this.pressureStatus,
+      conformity: conformity ?? this.conformity,
+      value: value ?? this.value,
+      valueType: valueType ?? this.valueType,
+      attachments: attachments ?? this.attachments,
+      comment: comment ?? this.comment,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'tagNumber': tagNumber,
+      'designation': designation,
+      'type': type,
+      'site': site,
+      'location': location,
+      'lastControlDate': lastControlDate,
+      'nextDueDate': nextDueDate,
+      'status': status,
+      'pressureStatus': pressureStatus,
+      'conformity': conformity,
+      'value': value,
+      'valueType': valueType,
+      'attachments': attachments,
+      'comment': comment,
+    };
+  }
+
+  factory EquipmentItemData.fromJson(Map<String, dynamic> json) {
+    return EquipmentItemData(
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? ''),
+      tagNumber: json['tagNumber']?.toString() ?? 'EQ-00',
+      designation: json['designation']?.toString() ?? 'Équipement',
+      type: json['type']?.toString() ?? 'Extincteur',
+      site: json['site']?.toString() ?? 'Station Galana',
+      location: json['location']?.toString() ?? 'Piste',
+      lastControlDate: json['lastControlDate']?.toString() ?? 'Récent',
+      nextDueDate: json['nextDueDate']?.toString() ?? 'Dans 1 mois',
+      status: json['status']?.toString() ?? 'Conforme',
+      pressureStatus: json['pressureStatus']?.toString() ?? 'Normal',
+      conformity: json['conformity'] == true || json['conformity'] == 1,
+      value: json['value'],
+      valueType: json['valueType']?.toString() ?? 'number',
+      attachments: (json['attachments'] as List?)?.map((e) => e.toString()).toList() ?? [],
+      comment: json['comment']?.toString(),
+    );
+  }
 }
 
 class EquipmentMonitoringListView extends StatefulWidget {
