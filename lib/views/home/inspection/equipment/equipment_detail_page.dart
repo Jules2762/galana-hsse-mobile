@@ -1,6 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
+import 'package:gestion_hsse/cores/services/camera_service.dart';
 import 'package:gestion_hsse/cores/services/equipment_service.dart';
+import 'package:gestion_hsse/cores/services/offline_storage_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
@@ -93,8 +96,86 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
     }
   }
 
+  void _showPhotoPickerSheet({required Function(String path) onPhotoSelected}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  "Preuve photo de l'équipement",
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.camera_alt, color: AppColors.primary),
+                  title: const Text("Prendre une photo (Appareil photo)"),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final file = await CameraService.takePhoto();
+                    if (file != null) {
+                      onPhotoSelected(file.path);
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.photo_library, color: AppColors.primary),
+                  title: const Text("Choisir depuis la galerie"),
+                  onTap: () async {
+                    Navigator.pop(ctx);
+                    final file = await CameraService.pickFromGallery();
+                    if (file != null) {
+                      onPhotoSelected(file.path);
+                    }
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _previewPhoto(String path) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            InteractiveViewer(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: path.startsWith('http')
+                    ? Image.network(path, fit: BoxFit.contain)
+                    : Image.file(File(path), fit: BoxFit.contain),
+              ),
+            ),
+            IconButton(
+              icon: const Icon(Icons.close, color: Colors.white, size: 28),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _showPerformControlBottomSheet() {
     final observationController = TextEditingController();
+    final List<String> newPhotoPaths = [];
 
     showModalBottomSheet(
       context: context,
@@ -248,7 +329,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                               const SizedBox(width: 8),
                               const Expanded(
                                 child: Text(
-                                  "Anomalie détectée : L'extincteur sera classé Non-conforme.",
+                                  "Anomalie détectée : L'équipement sera classé Non-conforme.",
                                   style: TextStyle(
                                     fontSize: 11,
                                     color: Color(0xFF991B1B),
@@ -290,22 +371,83 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                         ),
                       ),
 
-                      const SizedBox(height: 12),
+                      const SizedBox(height: 14),
 
-                      // Photo justificative
+                      // Preuves photos ajoutées
+                      const Text(
+                        "Preuves photos du contrôle :",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+
+                      if (newPhotoPaths.isNotEmpty) ...[
+                        SizedBox(
+                          height: 72,
+                          child: ListView.separated(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: newPhotoPaths.length,
+                            separatorBuilder: (context, index) => const SizedBox(width: 8),
+                            itemBuilder: (context, idx) {
+                              final p = newPhotoPaths[idx];
+                              return Stack(
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Image.file(
+                                      File(p),
+                                      width: 72,
+                                      height: 72,
+                                      fit: BoxFit.cover,
+                                    ),
+                                  ),
+                                  Positioned(
+                                    top: 2,
+                                    right: 2,
+                                    child: GestureDetector(
+                                      onTap: () {
+                                        setModalState(() {
+                                          newPhotoPaths.removeAt(idx);
+                                        });
+                                      },
+                                      child: Container(
+                                        padding: const EdgeInsets.all(2),
+                                        decoration: const BoxDecoration(
+                                          color: Colors.black54,
+                                          shape: BoxShape.circle,
+                                        ),
+                                        child: const Icon(Icons.close, size: 14, color: Colors.white),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                      ],
+
                       Row(
                         children: [
                           OutlinedButton.icon(
                             onPressed: () {
-                              setModalState(() {
-                                photoCount++;
-                              });
+                              _showPhotoPickerSheet(
+                                onPhotoSelected: (path) {
+                                  setModalState(() {
+                                    newPhotoPaths.add(path);
+                                  });
+                                },
+                              );
                             },
-                            icon: const Icon(Icons.camera_alt_outlined, size: 16),
+                            icon: const Icon(Icons.camera_alt, size: 16),
                             label: Text(
-                              photoCount > 0
-                                  ? "$photoCount photo(s) jointe(s)"
-                                  : "Preuve photo",
+                              newPhotoPaths.isNotEmpty
+                                  ? "${newPhotoPaths.length} photo(s) ajoutée(s)"
+                                  : "Prendre / Ajouter photo",
                               style: const TextStyle(fontSize: 12),
                             ),
                           ),
@@ -368,23 +510,22 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                   observation: observationController.text.trim().isNotEmpty
                                       ? observationController.text.trim()
                                       : null,
-                                  photoCount: photoCount,
+                                  newPhotoPaths: newPhotoPaths,
                                 );
 
                                 if (!mounted) return;
                                 setState(() {
                                   equipment = updated;
                                   inspectionHistory.insert(0, {
-                                    "date": "Aujourd'hui (14 Oct 2026)",
-                                    "inspector": "Jules Rakoto (Inspecteur HSSE)",
-                                    "type": "Contrôle Mensuel Réglementaire",
+                                    "date": "Aujourd'hui (${DateTime.now().day} Oct ${DateTime.now().year})",
+                                    "inspector": "Inspecteur HSSE Galana",
+                                    "type": "Contrôle Périodique Terrain",
                                     "status": isAllConforme ? "Conforme" : "Non-conforme",
                                   });
                                 });
 
                                 final isOnline = SyncService.instance.isOnline;
                                 messenger.showSnackBar(
-
                                   SnackBar(
                                     duration: const Duration(seconds: 4),
                                     content: Row(
@@ -404,7 +545,6 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                   ),
                                 );
                               },
-
                             ),
                           ),
                         ],
@@ -692,6 +832,100 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                   ],
                 ),
               ),
+
+              const SizedBox(height: 20),
+
+              // ==================== PREUVES PHOTOS ATTACHÉES ====================
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.photo_camera, size: 20, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        "Preuves Photos (${equipment.attachments.length})",
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      minimumSize: Size.zero,
+                    ),
+                    onPressed: () {
+                      _showPhotoPickerSheet(
+                        onPhotoSelected: (path) async {
+                          final updated = equipment.copyWith(
+                            attachments: [...equipment.attachments, path],
+                          );
+                          setState(() {
+                            equipment = updated;
+                          });
+                          await OfflineStorageService.updateCachedEquipment(updated);
+                          if (equipment.id != null) {
+                            EquipmentService.uploadItemPhoto(equipment.id!, File(path));
+                          }
+                        },
+                      );
+                    },
+                    icon: const Icon(Icons.add_a_photo, size: 14),
+                    label: const Text("Ajouter", style: TextStyle(fontSize: 12)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (equipment.attachments.isEmpty)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.add_photo_alternate_outlined, size: 36, color: Colors.grey.shade400),
+                      const SizedBox(height: 6),
+                      const Text(
+                        "Aucune photo enregistrée pour cet équipement",
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  height: 96,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: equipment.attachments.length,
+                    separatorBuilder: (context, index) => const SizedBox(width: 10),
+                    itemBuilder: (context, idx) {
+                      final photoUrl = equipment.attachments[idx];
+                      return GestureDetector(
+                        onTap: () => _previewPhoto(photoUrl),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(14),
+                          child: Container(
+                            width: 96,
+                            height: 96,
+                            color: Colors.grey.shade100,
+                            child: photoUrl.startsWith('http')
+                                ? Image.network(photoUrl, fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.broken_image))
+                                : Image.file(File(photoUrl), fit: BoxFit.cover, errorBuilder: (c, e, s) => const Icon(Icons.image)),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
 
               const SizedBox(height: 20),
 
