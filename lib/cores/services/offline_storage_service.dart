@@ -317,9 +317,18 @@ class OfflineStorageService {
         final total = updatedItems.length;
         final confCount = updatedItems.where((i) => i.conformity).length;
         final rate = total > 0 ? (confCount / total) * 100.0 : 100.0;
+        String newStatus = current.status;
+        String newRawStatus = current.rawStatus;
+        if (current.status.toLowerCase().contains('planifi') || current.rawStatus.toUpperCase() == 'DRAFT') {
+          newStatus = 'En cours';
+          newRawStatus = 'IN_PROGRESS';
+        }
+
         monitorings[idx] = current.copyWith(
           items: updatedItems,
           conformityRate: rate,
+          status: newStatus,
+          rawStatus: newRawStatus,
         );
         await cacheEquipmentMonitorings(monitorings);
       }

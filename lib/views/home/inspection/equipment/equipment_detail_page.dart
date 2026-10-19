@@ -255,6 +255,120 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
     }
   }
 
+  /// Dialogue de confirmation pour clôturer le suivi matériel
+  void _showClosureDialog() {
+    final int total = _monitoring.totalEquipments;
+    final int anomalies = _monitoring.anomalyCount;
+    final double rate = _monitoring.calculatedRate;
+
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.check_circle_outline, color: Color(0xFF15803D), size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                "Clôturer le suivi",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Vous êtes sur le point de clôturer ce suivi matériel pour ${_monitoring.siteName} :",
+              style: const TextStyle(fontSize: 13, color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Matériels contrôlés :", style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      Text("$total", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text("Taux de conformité :", style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                      Text(
+                        "${rate.toStringAsFixed(0)}%",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: rate >= 90 ? const Color(0xFF15803D) : const Color(0xFFDC2626),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (anomalies > 0) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text("Anomalies constatées :", style: TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                        Text("$anomalies", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFDC2626))),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              "Le statut sera marqué comme 'Clôturée'. Vous pourrez toujours consulter les données.",
+              style: TextStyle(fontSize: 11, fontStyle: FontStyle.italic, color: Color(0xFF64748B)),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text("Annuler"),
+          ),
+          ElevatedButton.icon(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _changeStatus("Clôturée");
+            },
+            icon: const Icon(Icons.check, size: 18, color: Colors.white),
+            label: const Text(
+              "Confirmer la clôture",
+              style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF15803D),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Bottom sheet d'ajout d'équipement unitaire sur le terrain (sans saisie de quantité)
   void _showAddEquipmentSheet() {
     final nameController = TextEditingController();
@@ -660,10 +774,17 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                             final confCount = updatedItems.where((i) => i.conformity).length;
                             final newRate = total > 0 ? (confCount / total) * 100.0 : 100.0;
 
+                            final isPlanifiee = _monitoring.status.toLowerCase().contains('planifi') ||
+                                _monitoring.rawStatus.toUpperCase() == 'DRAFT';
+                            final nextStatus = isPlanifiee ? 'En cours' : _monitoring.status;
+                            final nextRawStatus = isPlanifiee ? 'IN_PROGRESS' : _monitoring.rawStatus;
+
                             setState(() {
                               _monitoring = _monitoring.copyWith(
                                 items: updatedItems,
                                 conformityRate: newRate,
+                                status: nextStatus,
+                                rawStatus: nextRawStatus,
                               );
                             });
 
@@ -744,11 +865,12 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
         foregroundColor: Colors.white,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: _refreshMonitoring,
-            tooltip: "Actualiser",
-          ),
+          if (_monitoring.status != 'Clôturée')
+            IconButton(
+              icon: const Icon(Icons.check_circle_outline_rounded, size: 24),
+              onPressed: _showClosureDialog,
+              tooltip: "Clôturer le suivi",
+            ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert_rounded),
             onSelected: (val) {
@@ -769,15 +891,21 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAddEquipmentSheet,
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text(
-          "Ajouter un matériel",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-        ),
-      ),
+      floatingActionButton: _monitoring.status == 'Clôturée'
+          ? null
+          : FloatingActionButton.extended(
+              heroTag: 'fab_add_equipment',
+              onPressed: _showAddEquipmentSheet,
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              elevation: 4,
+              icon: const Icon(Icons.add_rounded, size: 22, color: Colors.white),
+              label: const Text(
+                "+ Matériel",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white),
+              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
       body: RefreshIndicator(
         onRefresh: _refreshMonitoring,
         color: AppColors.primary,
@@ -859,6 +987,48 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                       Text(
                         _monitoring.observations!,
                         style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF475569)),
+                      ),
+                    ],
+                    if (_monitoring.status != 'Clôturée') ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _showClosureDialog,
+                          icon: const Icon(Icons.check_circle_outline, size: 18, color: Color(0xFF15803D)),
+                          label: const Text(
+                            "Clôturer ce suivi matériel",
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF15803D), fontSize: 13),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF16A34A)),
+                            backgroundColor: const Color(0xFFF0FDF4),
+                            padding: const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ] else ...[
+                      const SizedBox(height: 14),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFDCFCE7),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF86EFAC)),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.verified_rounded, color: Color(0xFF15803D), size: 18),
+                            const SizedBox(width: 8),
+                            Text(
+                              "Suivi matériel clôturé (${_monitoring.calculatedRate.toStringAsFixed(0)}% conforme)",
+                              style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF15803D), fontSize: 13),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ],
