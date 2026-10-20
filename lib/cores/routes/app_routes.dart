@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gestion_hsse/views/auth/forgot_password_page.dart';
 import 'package:gestion_hsse/views/auth/login_page.dart';
 import 'package:gestion_hsse/views/auth/reset_password_page.dart';
+import 'package:gestion_hsse/views/home/emergency/emergency_contacts_page.dart';
 import 'package:gestion_hsse/views/home/inspection/checklist_detail_page.dart';
 import 'package:gestion_hsse/views/home/inspection/corrective_action_page.dart';
 import 'package:gestion_hsse/views/home/inspection/inspection_question_page.dart';
@@ -29,6 +30,7 @@ class AppRoutes {
   static const String equipmentDetail = "/equipment-detail";
   static const String vmcDetail = "/vmc-detail";
   static const String inspections = "/inspections";
+  static const String emergencyContacts = "/emergency-contacts";
 
   static Map<String, WidgetBuilder> routes = {
     login: (_) => const LoginPage(),
@@ -45,5 +47,6 @@ class AppRoutes {
     changePassword: (_) => const ChangePasswordPage(),
     equipmentDetail: (_) => const EquipmentDetailPage(),
     vmcDetail: (_) => const VmcDetailPage(),
+    emergencyContacts: (_) => const EmergencyContactsPage(),
   };
 }

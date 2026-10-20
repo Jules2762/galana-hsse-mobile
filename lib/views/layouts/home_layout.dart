@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/notification_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
@@ -183,6 +184,40 @@ class _StateHomeLayout extends State<HomeLayout> {
             ],
           ),
           actions: [
+            // Bouton SOS Contacts d'Urgence
+            Padding(
+              padding: const EdgeInsets.only(right: 6),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(20),
+                onTap: () {
+                  Navigator.pushNamed(context, AppRoutes.emergencyContacts);
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEE2E2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: const Color(0xFFFCA5A5)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.phone_in_talk, size: 13, color: Color(0xFFDC2626)),
+                      SizedBox(width: 4),
+                      Text(
+                        'SOS',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: Color(0xFFDC2626),
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             ListenableBuilder(
               listenable: SyncService.instance,
               builder: (context, _) {

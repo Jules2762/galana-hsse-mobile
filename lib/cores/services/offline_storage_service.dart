@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:gestion_hsse/cores/models/emergency_contact_model.dart';
 import 'package:gestion_hsse/cores/models/report_model.dart';
 import 'package:gestion_hsse/views/home/inspection/checklist/checklist_list_view.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
@@ -13,6 +14,8 @@ class OfflineStorageService {
   static const String _keyEquipments = 'offline_cached_equipments';
   static const String _keyEquipmentMonitorings = 'offline_cached_equipment_monitorings';
   static const String _keyReports = 'offline_cached_reports';
+  static const String _keyEmergencyContacts = 'offline_cached_emergency_contacts';
+  static const String _keyEmergencySites = 'offline_cached_emergency_sites';
   static const String _keyVmcDetailPrefix = 'offline_cached_vmc_detail_';
 
 
@@ -419,6 +422,66 @@ class OfflineStorageService {
       }
     } catch (e) {
       debugPrint('[OfflineStorage] Erreur lecture Rapports en cache: $e');
+    }
+    return [];
+  }
+
+  // ==========================================
+  // CONTACTS D'URGENCE & SECOURS (HSSE)
+  // ==========================================
+
+  /// Sauvegarde les contacts d'urgence en local
+  static Future<void> cacheEmergencyContacts(List<EmergencyContactModel> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = items.map((c) => c.toJson()).toList();
+      await prefs.setString(_keyEmergencyContacts, jsonEncode(list));
+    } catch (e) {
+      debugPrint('[OfflineStorage] Erreur cache Contacts d urgence: $e');
+    }
+  }
+
+  /// Récupère les contacts d'urgence en local
+  static Future<List<EmergencyContactModel>> getCachedEmergencyContacts() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyEmergencyContacts);
+      if (raw != null && raw.isNotEmpty) {
+        final List list = jsonDecode(raw);
+        return list
+            .map((json) => EmergencyContactModel.fromJson(Map<String, dynamic>.from(json)))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[OfflineStorage] Erreur lecture Contacts d urgence en cache: $e');
+    }
+    return [];
+  }
+
+  /// Sauvegarde les stations Galana pour le module d'urgence
+  static Future<void> cacheEmergencySites(List<EmergencySiteModel> items) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final list = items.map((s) => s.toJson()).toList();
+      await prefs.setString(_keyEmergencySites, jsonEncode(list));
+    } catch (e) {
+      debugPrint('[OfflineStorage] Erreur cache Stations Galana: $e');
+    }
+  }
+
+  /// Récupère les stations Galana en local
+  static Future<List<EmergencySiteModel>> getCachedEmergencySites() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_keyEmergencySites);
+      if (raw != null && raw.isNotEmpty) {
+        final List list = jsonDecode(raw);
+        return list
+            .map((json) => EmergencySiteModel.fromJson(Map<String, dynamic>.from(json)))
+            .toList();
+      }
+    } catch (e) {
+      debugPrint('[OfflineStorage] Erreur lecture Stations Galana en cache: $e');
     }
     return [];
   }
