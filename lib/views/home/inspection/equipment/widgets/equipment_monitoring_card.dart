@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
 
@@ -49,6 +50,7 @@ class EquipmentMonitoringCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAssignedToMe = ApiClient.isAssignedToCurrentUser(monitoring.inspector);
     final int total = monitoring.totalEquipments;
     final int conformes = monitoring.conformeCount;
     final int anomalies = monitoring.anomalyCount;
@@ -62,7 +64,7 @@ class EquipmentMonitoringCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+          border: Border.all(color: isAssignedToMe ? const Color(0xFF93C5FD) : AppColors.border.withValues(alpha: 0.8), width: isAssignedToMe ? 1.5 : 1.0),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -173,16 +175,39 @@ class EquipmentMonitoringCard extends StatelessWidget {
             // ==================== INSPECTEUR & DATE ====================
             Row(
               children: [
-                const Icon(Icons.person_outline_rounded, size: 14, color: Color(0xFF64748B)),
+                Icon(isAssignedToMe ? Icons.person_pin : Icons.person_outline_rounded, size: 14, color: isAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
                     monitoring.inspector,
-                    style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: isAssignedToMe ? FontWeight.w600 : FontWeight.normal,
+                      color: isAssignedToMe ? const Color(0xFF1E40AF) : const Color(0xFF64748B),
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
+                if (isAssignedToMe) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: const Text(
+                      "Attribuée",
+                      style: TextStyle(
+                        fontSize: 9.5,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF1D4ED8),
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(width: 10),
                 const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF64748B)),
                 const SizedBox(width: 4),

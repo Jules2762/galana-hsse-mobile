@@ -157,6 +157,42 @@ class EmergencyContactModel {
       'distance_km': distanceKm,
     };
   }
+
+  EmergencyContactModel copyWith({
+    dynamic id,
+    String? name,
+    String? type,
+    String? locality,
+    String? province,
+    double? latitude,
+    double? longitude,
+    String? contact1,
+    String? contact2,
+    String? contact3,
+    String? email,
+    String? address,
+    String? notes,
+    List<String>? siteNames,
+    double? distanceKm,
+  }) {
+    return EmergencyContactModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      type: type ?? this.type,
+      locality: locality ?? this.locality,
+      province: province ?? this.province,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      contact1: contact1 ?? this.contact1,
+      contact2: contact2 ?? this.contact2,
+      contact3: contact3 ?? this.contact3,
+      email: email ?? this.email,
+      address: address ?? this.address,
+      notes: notes ?? this.notes,
+      siteNames: siteNames ?? this.siteNames,
+      distanceKm: distanceKm ?? this.distanceKm,
+    );
+  }
 }
 
 class EmergencySiteModel {

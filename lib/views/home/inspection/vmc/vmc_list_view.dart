@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
@@ -169,6 +170,7 @@ class VmcListView extends StatefulWidget {
 
 class _VmcListViewState extends State<VmcListView> {
   int selectedStatusFilter = 0;
+  bool onlyAssignedToMe = false;
   int selectedTypeFilter = 0;
   final TextEditingController searchController = TextEditingController();
   String searchQuery = "";
@@ -364,8 +366,15 @@ class _VmcListViewState extends State<VmcListView> {
     }
   }
 
+  int get assignedToMeCount =>
+      vmcList.where((it) => ApiClient.isAssignedToCurrentUser(it.inspector)).length;
+
   List<VmcItemData> get filteredVmcList {
     return vmcList.where((item) {
+      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(item.inspector)) {
+        return false;
+      }
+
       final matchesSearch = searchQuery.isEmpty ||
           item.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
           item.reference.toLowerCase().contains(searchQuery.toLowerCase()) ||
@@ -514,7 +523,50 @@ class _VmcListViewState extends State<VmcListView> {
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: List.generate(statusFilters.length, (index) {
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          onlyAssignedToMe = !onlyAssignedToMe;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: onlyAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: onlyAssignedToMe ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE),
+                            width: onlyAssignedToMe ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              onlyAssignedToMe ? Icons.check_circle : Icons.person_pin,
+                              size: 15,
+                              color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              "Attribuées à moi ($assignedToMeCount)",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  ...List.generate(statusFilters.length, (index) {
                   return Padding(
                     padding: const EdgeInsets.only(right: 8),
                     child: InspectionFilterChip(
@@ -529,6 +581,7 @@ class _VmcListViewState extends State<VmcListView> {
                     ),
                   );
                 }),
+                ],
               ),
             ),
 

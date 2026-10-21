@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 
 class VmcCard extends StatelessWidget {
@@ -62,6 +63,7 @@ class VmcCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isAssignedToMe = ApiClient.isAssignedToCurrentUser(inspector);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -70,7 +72,7 @@ class VmcCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+          border: Border.all(color: isAssignedToMe ? const Color(0xFF93C5FD) : AppColors.border.withValues(alpha: 0.8), width: isAssignedToMe ? 1.5 : 1.0),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -220,10 +222,14 @@ class VmcCard extends StatelessWidget {
             // ==================== INSPECTEUR ====================
             Row(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 10,
-                  backgroundColor: AppColors.primaryLight,
-                  child: Icon(Icons.person, size: 12, color: AppColors.primary),
+                  backgroundColor: isAssignedToMe ? const Color(0xFFDBEAFE) : AppColors.primaryLight,
+                  child: Icon(
+                    isAssignedToMe ? Icons.person_pin : Icons.person,
+                    size: 12,
+                    color: isAssignedToMe ? const Color(0xFF2563EB) : AppColors.primary,
+                  ),
                 ),
                 const SizedBox(width: 6),
                 Expanded(
@@ -238,6 +244,32 @@ class VmcCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (isAssignedToMe) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.assignment_ind, size: 10, color: Color(0xFF2563EB)),
+                        SizedBox(width: 3),
+                        Text(
+                          "Attribuée",
+                          style: TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 if (complianceRate != null)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

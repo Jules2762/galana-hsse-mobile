@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/views/home/inspection/widgets/inspection_progress_bar.dart';
 import 'package:gestion_hsse/views/home/inspection/widgets/inspection_status_badge.dart';
 
@@ -24,43 +25,44 @@ class InspectionCard extends StatelessWidget {
     this.onTap,
   });
 
-
   @override
   Widget build(BuildContext context) {
+    final bool isAssignedToMe = ApiClient.isAssignedToCurrentUser(inspector);
+
     return InkWell(
       borderRadius: BorderRadius.circular(24),
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(16),
-
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(
+            color: isAssignedToMe ? const Color(0xFF93C5FD) : const Color(0xFFE2E8F0),
+            width: isAssignedToMe ? 1.5 : 1.0,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: .04),
+              color: isAssignedToMe
+                  ? const Color(0xFF3B82F6).withValues(alpha: .06)
+                  : Colors.black.withValues(alpha: .04),
               blurRadius: 16,
               offset: const Offset(0, 4),
             ),
           ],
         ),
-
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-
           children: [
             // =====================
             // HEADER
             // =====================
-
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: Column(
-                    crossAxisAlignment:
-                        CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         title,
@@ -70,9 +72,7 @@ class InspectionCard extends StatelessWidget {
                           color: Color(0xFF334155),
                         ),
                       ),
-
                       const SizedBox(height: 6),
-
                       Text(
                         site,
                         style: const TextStyle(
@@ -83,7 +83,6 @@ class InspectionCard extends StatelessWidget {
                     ],
                   ),
                 ),
-
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -121,13 +120,11 @@ class InspectionCard extends StatelessWidget {
               ],
             ),
 
-
             const SizedBox(height: 20),
 
             // =====================
             // PROGRESS
             // =====================
-
             Row(
               children: [
                 const Text(
@@ -138,9 +135,7 @@ class InspectionCard extends StatelessWidget {
                     color: Color(0xFF64748B),
                   ),
                 ),
-
                 const Spacer(),
-
                 Text(
                   "${(progress * 100).toInt()}%",
                   style: const TextStyle(
@@ -161,33 +156,55 @@ class InspectionCard extends StatelessWidget {
             const SizedBox(height: 16),
 
             // =====================
-            // INSPECTOR
+            // INSPECTOR & ASSIGNATION
             // =====================
-
             Row(
               children: [
-                const CircleAvatar(
+                CircleAvatar(
                   radius: 16,
-                  backgroundColor: Color(0xFFE8F5EE),
-
+                  backgroundColor: isAssignedToMe ? const Color(0xFFDBEAFE) : const Color(0xFFE8F5EE),
                   child: Icon(
-                    Icons.person,
+                    isAssignedToMe ? Icons.person_pin : Icons.person,
                     size: 16,
-                    color: Color(0xFF0F9D58),
+                    color: isAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFF0F9D58),
                   ),
                 ),
-
                 const SizedBox(width: 10),
-
                 Expanded(
                   child: Text(
                     "$inspector • $date",
                     style: const TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF94A3B8),
+                      color: Color(0xFF64748B),
                     ),
                   ),
                 ),
+                if (isAssignedToMe) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.assignment_ind, size: 12, color: Color(0xFF2563EB)),
+                        SizedBox(width: 4),
+                        Text(
+                          "Attribuée à vous",
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ],

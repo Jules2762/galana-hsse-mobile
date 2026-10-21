@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/checklist_service.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
@@ -37,6 +38,7 @@ class ChecklistListView extends StatefulWidget {
 
 class _ChecklistListViewState extends State<ChecklistListView> {
   int selectedFilter = 0;
+  bool onlyAssignedToMe = false;
   final TextEditingController searchController = TextEditingController();
   String searchQuery = "";
   bool isLoading = false;
@@ -86,8 +88,15 @@ class _ChecklistListViewState extends State<ChecklistListView> {
     }
   }
 
+  int get assignedToMeCount =>
+      checklistItems.where((it) => ApiClient.isAssignedToCurrentUser(it.inspector)).length;
+
   List<ChecklistItemData> get filteredChecklists {
     return checklistItems.where((item) {
+      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(item.inspector)) {
+        return false;
+      }
+
       final matchesSearch = searchQuery.isEmpty ||
           item.title.toLowerCase().contains(searchQuery.toLowerCase()) ||
           item.site.toLowerCase().contains(searchQuery.toLowerCase()) ||
@@ -144,24 +153,71 @@ class _ChecklistListViewState extends State<ChecklistListView> {
 
                 const SizedBox(height: 14),
 
-                // ==================== FILTRES STATUTS ====================
+                // ==================== FILTRES STATUTS & ASSIGNATION ====================
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
-                    children: List.generate(filters.length, (index) {
-                      return Padding(
+                    children: [
+                      // Chip Attribuées à moi
+                      Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: InspectionFilterChip(
-                          label: filters[index],
-                          selected: selectedFilter == index,
+                        child: InkWell(
                           onTap: () {
                             setState(() {
-                              selectedFilter = index;
+                              onlyAssignedToMe = !onlyAssignedToMe;
                             });
                           },
+                          borderRadius: BorderRadius.circular(20),
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: onlyAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFFEFF6FF),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: onlyAssignedToMe ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE),
+                                width: onlyAssignedToMe ? 1.5 : 1.0,
+                              ),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  onlyAssignedToMe ? Icons.check_circle : Icons.person_pin,
+                                  size: 15,
+                                  color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                                ),
+                                const SizedBox(width: 5),
+                                Text(
+                                  "Attribuées à moi ($assignedToMeCount)",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ),
-                      );
-                    }),
+                      ),
+
+                      // Filtres statuts standards
+                      ...List.generate(filters.length, (index) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: InspectionFilterChip(
+                            label: filters[index],
+                            selected: selectedFilter == index,
+                            onTap: () {
+                              setState(() {
+                                selectedFilter = index;
+                              });
+                            },
+                          ),
+                        );
+                      }),
+                    ],
                   ),
                 ),
 
@@ -183,19 +239,23 @@ class _ChecklistListViewState extends State<ChecklistListView> {
                       children: [
                         Icon(Icons.fact_check_outlined, size: 48, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
-                        const Text(
-                          "Aucune checklist trouvée",
-                          style: TextStyle(
+                        Text(
+                          onlyAssignedToMe
+                              ? "Aucune inspection attribuée"
+                              : "Aucune checklist trouvée",
+                          style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                             color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
-                          "Essayez de modifier votre recherche ou le filtre de statut.",
+                        Text(
+                          onlyAssignedToMe
+                              ? "Aucune inspection n'est actuellement assignée à votre profil."
+                              : "Essayez de modifier votre recherche ou le filtre de statut.",
                           textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
                         ),
                       ],
                     ),

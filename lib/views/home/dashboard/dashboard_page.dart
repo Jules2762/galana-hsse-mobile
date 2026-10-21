@@ -9,7 +9,7 @@ import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/services/vmc_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/dashboard/widgets/activity_card.dart';
-import 'package:gestion_hsse/views/home/dashboard/widgets/bar_chart.dart';
+import 'package:gestion_hsse/views/home/dashboard/widgets/performance_chart_card.dart';
 import 'package:gestion_hsse/views/home/dashboard/widgets/quick_action.dart';
 import 'package:gestion_hsse/views/home/dashboard/widgets/stat_card.dart';
 import 'package:gestion_hsse/views/home/inspection/checklist/checklist_list_view.dart';
@@ -639,36 +639,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 // ==========================================
                 // 7. PERFORMANCE HEBDOMADAIRE HSSE
                 // ==========================================
-                const Text(
-                  "Performance Hebdomadaire",
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 10),
-
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade200),
-                  ),
-                  child: const Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      BarChart(value: 35, day: "Lun"),
-                      BarChart(value: 55, day: "Mar"),
-                      BarChart(value: 40, day: "Mer"),
-                      BarChart(value: 80, day: "Jeu"),
-                      BarChart(value: 85, day: "Ven"),
-                      BarChart(value: 70, day: "Sam"),
-                      BarChart(value: 65, day: "Dim"),
-                    ],
-                  ),
+                PerformanceChartCard(
+                  vmcs: _vmcs,
+                  checklists: _checklists,
+                  equipments: _equipments,
                 ),
 
                 const SizedBox(height: 80),

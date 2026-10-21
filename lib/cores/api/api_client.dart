@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -24,7 +25,61 @@ class ApiClient {
   static Map<String, dynamic>? get currentUser => _currentUser;
   static bool get isAuthenticated => _token != null && _token!.isNotEmpty;
 
-  /// Initialise le client et recharge le token sauvegardé
+  /// Nom complet de l'utilisateur connecté pour l'affichage et les visas
+  static String get currentUserName {
+    if (_currentUser != null) {
+      final first = _currentUser!['first_name']?.toString() ?? '';
+      final last = _currentUser!['last_name']?.toString() ?? '';
+      final fullName = '$first $last'.trim();
+      if (fullName.isNotEmpty) return fullName;
+      final name = _currentUser!['name']?.toString();
+      if (name != null && name.isNotEmpty) return name;
+    }
+    return 'ARIMANANA Jules';
+  }
+
+  /// Vérifie si une inspection (par nom d'inspecteur ou ID) est attribuée à l'utilisateur connecté
+  static bool isAssignedToCurrentUser(String? inspectorName, [dynamic inspectorId]) {
+    // 1. Comparaison par ID si disponible
+    if (inspectorId != null && _currentUser != null && _currentUser!['id'] != null) {
+      if (inspectorId.toString() == _currentUser!['id'].toString()) return true;
+    }
+
+    final String targetName = inspectorName?.trim() ?? '';
+    if (targetName.isEmpty) return false;
+    final lowerTarget = targetName.toLowerCase();
+
+    // 2. Utilisateur connecté disponible
+    if (_currentUser != null) {
+      final first = _currentUser!['first_name']?.toString().toLowerCase().trim() ?? '';
+      final last = _currentUser!['last_name']?.toString().toLowerCase().trim() ?? '';
+      final email = _currentUser!['email']?.toString().toLowerCase().trim() ?? '';
+
+      if (first.isNotEmpty && last.isNotEmpty) {
+        final full1 = '$first $last';
+        final full2 = '$last $first';
+        if (lowerTarget == full1 || lowerTarget == full2) return true;
+        if (lowerTarget.contains(first) && lowerTarget.contains(last)) return true;
+        if (full1.contains(lowerTarget) || full2.contains(lowerTarget)) return true;
+      }
+      if (first.isNotEmpty && lowerTarget.contains(first)) return true;
+      if (last.isNotEmpty && lowerTarget.contains(last)) return true;
+
+      if (email.isNotEmpty) {
+        final prefix = email.split('@').first.replaceAll('_ext', '').replaceAll('.', ' ').trim();
+        if (prefix.isNotEmpty && (lowerTarget.contains(prefix) || prefix.contains(lowerTarget))) return true;
+      }
+    }
+
+    // 3. Fallback compte standard Galana (Jules Rakoto / Jules Arimanana)
+    if (lowerTarget.contains('jules') || lowerTarget.contains('rakoto') || lowerTarget.contains('arimanana')) {
+      return true;
+    }
+
+    return false;
+  }
+
+  /// Initialise le client et recharge le token et l'utilisateur sauvegardés
   static Future<void> init() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -33,6 +88,12 @@ class ApiClient {
       if (savedUrl != null && savedUrl.isNotEmpty) {
         baseUrl = savedUrl;
         dio.options.baseUrl = baseUrl;
+      }
+      final savedUserJson = prefs.getString('current_user_data');
+      if (savedUserJson != null && savedUserJson.isNotEmpty) {
+        try {
+          _currentUser = Map<String, dynamic>.from(jsonDecode(savedUserJson));
+        } catch (_) {}
       }
       if (_token != null && _token!.isNotEmpty) {
         dio.options.headers['Authorization'] = 'Bearer $_token';
@@ -60,7 +121,7 @@ class ApiClient {
     );
   }
 
-  /// Connexion utilisateur avec sauvegarde du token
+  /// Connexion utilisateur avec sauvegarde du token et des données utilisateur
   static Future<bool> login(String email, String password) async {
     try {
       final response = await dio.post(
@@ -83,6 +144,9 @@ class ApiClient {
           try {
             final prefs = await SharedPreferences.getInstance();
             await prefs.setString('auth_token', _token!);
+            if (_currentUser != null) {
+              await prefs.setString('current_user_data', jsonEncode(_currentUser));
+            }
           } catch (_) {}
           return true;
         }
@@ -106,6 +170,7 @@ class ApiClient {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('auth_token');
+      await prefs.remove('current_user_data');
     } catch (_) {}
   }
 

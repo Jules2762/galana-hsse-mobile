@@ -321,6 +321,7 @@ class EquipmentMonitoringListView extends StatefulWidget {
 class _EquipmentMonitoringListViewState
     extends State<EquipmentMonitoringListView> {
   int selectedStatusIndex = 0;
+  bool onlyAssignedToMe = false;
   final TextEditingController searchController = TextEditingController();
   String searchQuery = "";
 
@@ -374,8 +375,15 @@ class _EquipmentMonitoringListViewState
     }
   }
 
+  int get assignedToMeCount =>
+      monitoringList.where((m) => ApiClient.isAssignedToCurrentUser(m.inspector)).length;
+
   List<EquipmentMonitoringData> get filteredMonitorings {
     return monitoringList.where((m) {
+      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(m.inspector)) {
+        return false;
+      }
+
       if (searchQuery.isNotEmpty) {
         final q = searchQuery.toLowerCase();
         final matches = m.reference.toLowerCase().contains(q) ||
@@ -849,7 +857,50 @@ class _EquipmentMonitoringListViewState
               SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: List.generate(statuses.length, (index) {
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          onlyAssignedToMe = !onlyAssignedToMe;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: onlyAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: onlyAssignedToMe ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE),
+                            width: onlyAssignedToMe ? 1.5 : 1.0,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              onlyAssignedToMe ? Icons.check_circle : Icons.person_pin,
+                              size: 15,
+                              color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              "Attribuées à moi ($assignedToMeCount)",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  ...List.generate(statuses.length, (index) {
                     final status = statuses[index];
                     final isSelected = selectedStatusIndex == index;
                     return Padding(
@@ -864,8 +915,9 @@ class _EquipmentMonitoringListViewState
                           _loadMonitorings();
                         },
                       ),
-                    );
-                  }),
+                  );
+                }),
+                ],
                 ),
               ),
 

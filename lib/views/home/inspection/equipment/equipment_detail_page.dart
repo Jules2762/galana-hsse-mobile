@@ -989,7 +989,25 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                         style: const TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Color(0xFF475569)),
                       ),
                     ],
-                    if (_monitoring.status != 'Clôturée') ...[
+                    if (_monitoring.status == 'Planifiée') ...[
+                      const SizedBox(height: 14),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => _changeStatus('En cours'),
+                          icon: const Icon(Icons.play_arrow_rounded, size: 20, color: Colors.white),
+                          label: const Text(
+                            "Démarrer le contrôle terrain",
+                            style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white, fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ] else if (_monitoring.status != 'Clôturée') ...[
                       const SizedBox(height: 14),
                       SizedBox(
                         width: double.infinity,

@@ -3,6 +3,7 @@ import 'package:gestion_hsse/cores/models/emergency_contact_model.dart';
 import 'package:gestion_hsse/cores/services/emergency_contact_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
+import 'package:gestion_hsse/views/home/emergency/components/emergency_map_view.dart';
 
 class EmergencyContactsPage extends StatefulWidget {
   const EmergencyContactsPage({super.key});
@@ -15,6 +16,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
+  bool _isMapMode = false;
   List<EmergencyContactModel> _allContacts = [];
   List<EmergencyContactModel> _filteredContacts = [];
   List<EmergencySiteModel> _allSites = [];
@@ -763,14 +765,173 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
             onPressed: _loadData,
           ),
         ],
-        bottom: const PreferredSize(
-          preferredSize: Size.fromHeight(1),
-          child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(56),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+            ),
+            child: Container(
+              height: 42,
+              padding: const EdgeInsets.all(4),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        if (_isMapMode) setState(() => _isMapMode = false);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        decoration: BoxDecoration(
+                          color: !_isMapMode ? AppColors.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: !_isMapMode
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.28),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.format_list_bulleted_rounded,
+                              size: 16,
+                              color: !_isMapMode ? Colors.white : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              "Liste",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: !_isMapMode ? FontWeight.w700 : FontWeight.w600,
+                                color: !_isMapMode ? Colors.white : const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: !_isMapMode
+                                    ? Colors.white.withValues(alpha: 0.25)
+                                    : const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                "${_filteredContacts.length}",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: !_isMapMode ? Colors.white : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        if (!_isMapMode) setState(() => _isMapMode = true);
+                      },
+                      behavior: HitTestBehavior.opaque,
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 200),
+                        curve: Curves.easeInOut,
+                        decoration: BoxDecoration(
+                          color: _isMapMode ? AppColors.primary : Colors.transparent,
+                          borderRadius: BorderRadius.circular(10),
+                          boxShadow: _isMapMode
+                              ? [
+                                  BoxShadow(
+                                    color: AppColors.primary.withValues(alpha: 0.28),
+                                    blurRadius: 6,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.map_rounded,
+                              size: 16,
+                              color: _isMapMode ? Colors.white : const Color(0xFF64748B),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              "Carte",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: _isMapMode ? FontWeight.w700 : FontWeight.w600,
+                                color: _isMapMode ? Colors.white : const Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: _isMapMode
+                                    ? Colors.white.withValues(alpha: 0.25)
+                                    : const Color(0xFFE2E8F0),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                "${_allSites.length} stations",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: _isMapMode ? Colors.white : const Color(0xFF475569),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadData,
-        color: AppColors.primary,
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            )
+          : _isMapMode
+              ? EmergencyMapView(
+                  contacts: _allContacts,
+                  sites: _allSites,
+                  selectedType: _selectedType,
+                  selectedSite: _selectedSite,
+                  onSelectType: _selectType,
+                  onShowDetail: _showDetailBottomSheet,
+                  onDirectCall: (phone, name) =>
+                      EmergencyContactService.callPhone(phone, context),
+                )
+              : RefreshIndicator(
+                  onRefresh: _loadData,
+                  color: AppColors.primary,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.all(16),

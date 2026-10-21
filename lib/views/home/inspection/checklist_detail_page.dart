@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/checklist_service.dart';
+import 'package:gestion_hsse/cores/services/offline_storage_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/checklist/checklist_list_view.dart';
@@ -59,6 +60,23 @@ class _ChecklistDetailPageState extends State<ChecklistDetailPage> {
   }
 
   Future<void> _startOrContinueInspection() async {
+    if (status.toLowerCase().contains('planifi')) {
+      setState(() {
+        status = 'En cours';
+        if (progress == 0.0) progress = 0.1;
+      });
+      final inProgressItem = ChecklistItemData(
+        id: id,
+        title: title,
+        site: site,
+        inspector: inspector,
+        date: date,
+        progress: 0.1,
+        status: 'En cours',
+      );
+      await OfflineStorageService.updateCachedChecklist(inProgressItem);
+    }
+    if (!mounted) return;
     final result = await Navigator.pushNamed(
       context,
       AppRoutes.inspectionQuestion,
