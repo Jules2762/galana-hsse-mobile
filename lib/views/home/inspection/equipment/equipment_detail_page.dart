@@ -2,6 +2,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/services/camera_service.dart';
 import 'package:gestion_hsse/cores/services/equipment_service.dart';
+import 'package:gestion_hsse/cores/models/inspection_map_item.dart';
+import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
 
@@ -947,6 +949,43 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                             ),
                           ),
                         ),
+                        InkWell(
+                          onTap: () {
+                            Navigator.pushNamed(
+                              context,
+                              AppRoutes.inspectionsMap,
+                              arguments: {
+                                'type': InspectionType.equipment,
+                                'site': _monitoring.siteName,
+                              },
+                            );
+                          },
+                          borderRadius: BorderRadius.circular(8),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFECFDF5),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: const Color(0xFFA7F3D0)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: const [
+                                Icon(Icons.map_outlined, size: 13, color: Color(0xFF059669)),
+                                SizedBox(width: 4),
+                                Text(
+                                  "Carte",
+                                  style: TextStyle(
+                                    fontSize: 10.5,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF059669),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                           decoration: BoxDecoration(

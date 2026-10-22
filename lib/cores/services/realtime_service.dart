@@ -118,8 +118,8 @@ class RealtimeService extends ChangeNotifier {
 
   /// Récupération des nouveautés depuis l'API Laravel
   Future<void> _fetchUpdates() async {
-    // Si l'appareil est hors-ligne, on ne lance pas d'appel réseau
-    if (!SyncService.instance.isOnline) {
+    // Si l'appareil est hors-ligne ou l'utilisateur non authentifié, on ne lance pas d'appel réseau
+    if (!ApiClient.isAuthenticated || !SyncService.instance.isOnline) {
       if (_isLive) {
         _isLive = false;
         notifyListeners();
@@ -128,8 +128,6 @@ class RealtimeService extends ChangeNotifier {
     }
 
     try {
-      await ApiClient.ensureAuthenticated();
-
       final response = await ApiClient.dio.get(
         '/home/realtime/updates',
         queryParameters: {

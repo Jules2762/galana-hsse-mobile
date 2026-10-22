@@ -196,6 +196,11 @@ class SyncService extends ChangeNotifier {
 
     // S'assurer de l'authentification
     await ApiClient.ensureAuthenticated();
+    if (!ApiClient.isAuthenticated) {
+      _isSyncing = false;
+      notifyListeners();
+      return;
+    }
 
     // Re-vérifier l'état de la connexion
     final online = await checkConnectivity();

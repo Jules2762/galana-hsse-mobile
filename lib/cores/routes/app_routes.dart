@@ -7,6 +7,7 @@ import 'package:gestion_hsse/views/home/inspection/checklist_detail_page.dart';
 import 'package:gestion_hsse/views/home/inspection/corrective_action_page.dart';
 import 'package:gestion_hsse/views/home/inspection/inspection_question_page.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_detail_page.dart';
+import 'package:gestion_hsse/views/home/inspection/map/inspections_map_page.dart';
 import 'package:gestion_hsse/views/home/inspection/vmc/vmc_detail_page.dart';
 import 'package:gestion_hsse/views/home/profile/change_password_page.dart';
 import 'package:gestion_hsse/views/home/profile/edit_profile_page.dart';
@@ -30,6 +31,7 @@ class AppRoutes {
   static const String equipmentDetail = "/equipment-detail";
   static const String vmcDetail = "/vmc-detail";
   static const String inspections = "/inspections";
+  static const String inspectionsMap = "/inspections-map";
   static const String emergencyContacts = "/emergency-contacts";
 
   static Map<String, WidgetBuilder> routes = {
@@ -38,6 +40,7 @@ class AppRoutes {
     resetPassword: (_) => const ResetPasswordPage(),
     home: (_) => const HomeLayout(),
     inspections: (_) => const HomeLayout(initialIndex: 1),
+    inspectionsMap: (_) => const InspectionsMapPage(),
     checklistDetail: (_) => const ChecklistDetailPage(),
     inspectionQuestion: (_) => const InspectionQuestionPage(),
     correctiveAction: (_) => const CorrectiveActionPage(),

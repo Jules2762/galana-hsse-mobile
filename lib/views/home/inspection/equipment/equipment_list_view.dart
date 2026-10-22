@@ -380,7 +380,7 @@ class _EquipmentMonitoringListViewState
 
   List<EquipmentMonitoringData> get filteredMonitorings {
     return monitoringList.where((m) {
-      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(m.inspector)) {
+      if (!ApiClient.isAssignedToCurrentUser(m.inspector, m.id)) {
         return false;
       }
 
@@ -402,10 +402,10 @@ class _EquipmentMonitoringListViewState
     }).toList();
   }
 
-  int get totalCount => monitoringList.length;
-  int get inProgressCount => monitoringList.where((m) => m.status == 'En cours').length;
-  int get plannedCount => monitoringList.where((m) => m.status == 'Planifiée').length;
-  int get completedCount => monitoringList.where((m) => m.status == 'Clôturée').length;
+  int get totalCount => filteredMonitorings.length;
+  int get inProgressCount => filteredMonitorings.where((m) => m.status == 'En cours').length;
+  int get plannedCount => filteredMonitorings.where((m) => m.status == 'Planifiée').length;
+  int get completedCount => filteredMonitorings.where((m) => m.status == 'Clôturée').length;
 
   void _onCardTap(EquipmentMonitoringData monitoring) async {
     if (widget.onMonitoringTap != null) {
@@ -860,43 +860,34 @@ class _EquipmentMonitoringListViewState
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          onlyAssignedToMe = !onlyAssignedToMe;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: onlyAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: onlyAssignedToMe ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE),
-                            width: onlyAssignedToMe ? 1.5 : 1.0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFBFDBFE),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.person_pin,
+                            size: 15,
+                            color: Color(0xFF1D4ED8),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              onlyAssignedToMe ? Icons.check_circle : Icons.person_pin,
-                              size: 15,
-                              color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                          const SizedBox(width: 5),
+                          Text(
+                            "Mes assignations ($assignedToMeCount)",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1D4ED8),
                             ),
-                            const SizedBox(width: 5),
-                            Text(
-                              "Attribuées à moi ($assignedToMeCount)",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -950,7 +941,7 @@ class _EquipmentMonitoringListViewState
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        "Aucun suivi de matériel trouvé",
+                        "Aucun suivi de matériel attribué",
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
@@ -961,7 +952,7 @@ class _EquipmentMonitoringListViewState
                       Text(
                         searchQuery.isNotEmpty || selectedStatusIndex > 0
                             ? "Essayez de modifier vos critères de recherche ou de filtre."
-                            : "Créez une session de suivi pour enregistrer les équipements lors de votre inspection.",
+                            : "Aucun contrôle d'équipements n'est actuellement assigné à votre profil.",
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 12,

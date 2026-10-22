@@ -62,19 +62,30 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final vmcFuture = VmcService.getVmcs();
       final checklistFuture = ChecklistService.getChecklists();
-      final equipmentFuture = EquipmentService.getEquipments();
+      final monitoringFuture = EquipmentService.getMonitorings();
 
       final results = await Future.wait([
         vmcFuture,
         checklistFuture,
-        equipmentFuture,
+        monitoringFuture,
       ]);
 
       if (mounted) {
         setState(() {
-          _vmcs = results[0] as List<VmcItemData>;
-          _checklists = results[1] as List<ChecklistItemData>;
-          _equipments = results[2] as List<EquipmentItemData>;
+          final allVmcs = results[0] as List<VmcItemData>;
+          final allChecklists = results[1] as List<ChecklistItemData>;
+          final allMonitorings = results[2] as List<EquipmentMonitoringData>;
+
+          _vmcs = allVmcs
+              .where((v) => ApiClient.isAssignedToCurrentUser(v.inspector, v.id))
+              .toList();
+          _checklists = allChecklists
+              .where((c) => ApiClient.isAssignedToCurrentUser(c.inspector, c.id))
+              .toList();
+          final assignedMonitorings = allMonitorings
+              .where((m) => ApiClient.isAssignedToCurrentUser(m.inspector, m.id))
+              .toList();
+          _equipments = assignedMonitorings.expand((m) => m.items).toList();
           _isLoading = false;
         });
       }
@@ -105,7 +116,7 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   Widget build(BuildContext context) {
     final user = ApiClient.currentUser;
-    final userName = user?['name']?.toString() ?? 'ARIMANANA Maherison Jules';
+    final userName = ApiClient.currentUserName;
     final userRole = user?['role']?.toString() ?? 'Inspecteur HSSE • Galana Madagascar';
 
     return ListenableBuilder(
@@ -409,6 +420,76 @@ class _DashboardPageState extends State<DashboardPage> {
                 const SizedBox(height: 16),
 
                 // ==========================================
+                // 4.0 BANNIÈRE CARTOGRAPHIE DES INSPECTIONS
+                // ==========================================
+                InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.pushNamed(context, AppRoutes.inspectionsMap);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(14),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF0F172A), Color(0xFF1E293B)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFF0F172A).withValues(alpha: 0.25),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF3B82F6).withValues(alpha: 0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: const Color(0xFF3B82F6).withValues(alpha: 0.4),
+                            ),
+                          ),
+                          child: const Icon(Icons.map_rounded, color: Color(0xFF60A5FA), size: 24),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text(
+                                "Carte des Inspections",
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                "Voir VMC, Checklists & Matériel sur la carte",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Color(0xFF94A3B8),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 14, color: Colors.white70),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 12),
+
+                // ==========================================
                 // 4.1 BANNIÈRE CONTACTS D'URGENCE & SECOURS
                 // ==========================================
                 InkWell(
@@ -607,7 +688,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     padding: const EdgeInsets.all(20),
                     alignment: Alignment.center,
                     child: const Text(
-                      "Aucune inspection enregistrée pour le moment.",
+                      "Aucune inspection ne vous est actuellement attribuée.",
                       style: TextStyle(color: Colors.grey, fontSize: 13),
                     ),
                   )

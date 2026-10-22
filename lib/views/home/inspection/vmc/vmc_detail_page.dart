@@ -1,5 +1,9 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/services/camera_service.dart';
 import 'package:gestion_hsse/cores/services/personnel_service.dart';
+import 'package:gestion_hsse/cores/models/inspection_map_item.dart';
+import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/services/vmc_pdf_service.dart';
@@ -35,18 +39,16 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
 
   String _getGravityLabel(int level) {
     switch (level) {
-      case 0:
-        return "Négligeable";
       case 1:
-        return "Mineur";
+        return "1 - Mineur";
       case 2:
-        return "Modéré";
+        return "2 - Modéré";
       case 3:
-        return "Important";
+        return "3 - Important";
       case 4:
-        return "Majeur";
+        return "4 - Majeur";
       case 5:
-        return "Critique";
+        return "5 - Critique";
       default:
         return "Niveau $level";
     }
@@ -54,18 +56,16 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
 
   Color _getGravityColor(int level) {
     switch (level) {
-      case 0:
-        return const Color(0xFF16A34A); // Vert
       case 1:
-        return const Color(0xFF0284C7); // Bleu ciel
+        return const Color(0xFF16A34A); // Vert
       case 2:
-        return const Color(0xFFD97706); // Ambre / Jaune-orange
+        return const Color(0xFF0284C7); // Bleu ciel
       case 3:
-        return const Color(0xFFEA580C); // Orange foncé
+        return const Color(0xFFD97706); // Ambre
       case 4:
-        return const Color(0xFFDC2626); // Rouge
+        return const Color(0xFFEA580C); // Orange foncé
       case 5:
-        return const Color(0xFF991B1B); // Rouge très foncé / Critique
+        return const Color(0xFFDC2626); // Rouge
       default:
         return const Color(0xFFD97706);
     }
@@ -106,6 +106,15 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       final copy = Map<String, dynamic>.from(item);
       final bool? isYes = copy['yes'];
       copy['answer'] ??= (isYes == true ? 'OUI' : (isYes == false ? 'NON' : 'N/A'));
+      copy['photos'] ??= <String>[];
+      if (copy['answer'] == 'NON' && copy['action'] == null) {
+        copy['action'] = {
+          'description': "Action corrective pour l'écart constaté sur : ${copy['title']}",
+          'department': "Maintenance",
+          'assignee': "Marie Razafi (Superviseur)",
+          'priority': "Haute",
+        };
+      }
       return copy;
     }).toList();
     _initAwarenessSessions();
@@ -196,6 +205,21 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               ans = 'N/A';
             }
             final dynamic rawNum = it['order'] ?? it['num'] ?? (autoIndex++);
+            Map<String, dynamic>? action;
+            if (it['action'] is Map) {
+              action = Map<String, dynamic>.from(it['action']);
+            } else if (ans == 'NON') {
+              action = {
+                'description': "Action corrective pour l'écart sur : ${it['title'] ?? ''}",
+                'department': 'Maintenance',
+                'assignee': 'Marie Razafi (Superviseur)',
+                'priority': 'Haute',
+              };
+            }
+            List<String> photos = [];
+            if (it['photos'] is List) {
+              photos = (it['photos'] as List).map((p) => p.toString()).toList();
+            }
             return {
               'id': it['id'],
               'num': rawNum.toString(),
@@ -203,6 +227,8 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               'answer': ans,
               'yes': ans == 'OUI' ? true : (ans == 'NON' ? false : null),
               'obs': it['observation']?.toString() ?? '',
+              'photos': photos,
+              'action': action,
             };
           }).toList();
         }
@@ -575,6 +601,8 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                           item["answer"] = "NON";
                                           item["yes"] = false;
                                         });
+                                        _showCorrectiveActionDialogForItem(
+                                            item, setModalState);
                                       }
                                     },
                                   ),
@@ -602,6 +630,49 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                     },
                                   ),
                                   const Spacer(),
+                                  Stack(
+                                    clipBehavior: Clip.none,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(
+                                            Icons.camera_alt_outlined,
+                                            size: 20,
+                                            color: AppColors.textSecondary),
+                                        tooltip: "Prendre / ajouter une photo",
+                                        onPressed: () {
+                                          _pickPhotoForItem(
+                                              item, setModalState);
+                                        },
+                                      ),
+                                      if ((item['photos'] as List?)
+                                              ?.isNotEmpty ==
+                                          true)
+                                        Positioned(
+                                          right: 4,
+                                          top: 4,
+                                          child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            decoration: const BoxDecoration(
+                                              color: AppColors.primary,
+                                              shape: BoxShape.circle,
+                                            ),
+                                            constraints: const BoxConstraints(
+                                              minWidth: 14,
+                                              minHeight: 14,
+                                            ),
+                                            child: Text(
+                                              "${(item['photos'] as List).length}",
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              textAlign: TextAlign.center,
+                                            ),
+                                          ),
+                                        ),
+                                    ],
+                                  ),
                                   IconButton(
                                     icon: const Icon(Icons.add_comment_outlined,
                                         size: 18,
@@ -614,6 +685,49 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                   ),
                                 ],
                               ),
+                              if ((item['photos'] as List?)?.isNotEmpty == true)
+                                _buildPhotosPreview(item, setModalState),
+                              if (item['action'] != null)
+                                _buildActionCard(item, setModalState)
+                              else if (isNo)
+                                Padding(
+                                  padding:
+                                      const EdgeInsets.only(left: 34, top: 6),
+                                  child: InkWell(
+                                    onTap: () =>
+                                        _showCorrectiveActionDialogForItem(
+                                            item, setModalState),
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFEF2F2),
+                                        borderRadius:
+                                            BorderRadius.circular(10),
+                                        border: Border.all(
+                                            color: const Color(0xFFFECACA)),
+                                      ),
+                                      child: const Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(Icons.warning_amber_rounded,
+                                              size: 16,
+                                              color: Color(0xFFDC2626)),
+                                          SizedBox(width: 6),
+                                          Text(
+                                            "Action corrective requise • Cliquer pour définir",
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFFDC2626),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
                             ],
                           );
                         },
@@ -733,6 +847,456 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               Navigator.pop(context);
             },
             child: const Text("Valider", style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showCorrectiveActionDialogForItem(
+      Map<String, dynamic> item, StateSetter setModalState) async {
+    final existing = item['action'] as Map<String, dynamic>?;
+    final descCtrl = TextEditingController(
+      text: existing?['description']?.toString() ??
+          "Corriger l'écart constaté sur : ${item['title'] ?? ''}",
+    );
+    String assignee =
+        existing?['assignee']?.toString() ?? "ARIMANANA Maherison Jules (Inspecteur HSSE)";
+
+    final res = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        color: Color(0xFFDC2626), size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Action Corrective • Pt ${item['num'] ?? ''}",
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          item['title']?.toString() ?? '',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      "Description du plan d'action *",
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 3,
+                      decoration: InputDecoration(
+                        hintText: "Préciser l'action à mener...",
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: const BorderSide(color: AppColors.border),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      "Responsable / Personnel assigné *",
+                      style:
+                          TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                    ),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await PersonnelService.showPersonnelPicker(
+                          ctx,
+                          currentName: assignee,
+                        );
+                        if (picked != null) {
+                          setDialogState(() {
+                            assignee = "${picked.fullName} (${picked.fonction})";
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 11),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Icon(Icons.person,
+                                  size: 16, color: Color(0xFF1D4ED8)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                assignee.isNotEmpty
+                                    ? assignee
+                                    : "Sélectionner un responsable du personnel...",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: assignee.isNotEmpty
+                                      ? FontWeight.w600
+                                      : FontWeight.normal,
+                                  color: assignee.isNotEmpty
+                                      ? AppColors.textPrimary
+                                      : AppColors.textSecondary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const Icon(Icons.keyboard_arrow_down,
+                                size: 20, color: AppColors.textSecondary),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text("Ignorer"),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  icon: const Icon(Icons.check, size: 18),
+                  label: const Text("Enregistrer l'action"),
+                  onPressed: () {
+                    if (descCtrl.text.trim().isEmpty) return;
+                    Navigator.pop(ctx, true);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    if (res == true) {
+      final actionMap = {
+        'description': descCtrl.text.trim(),
+        'assignee': assignee,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
+      setModalState(() {
+        item['action'] = actionMap;
+      });
+      setState(() {});
+
+      final actId =
+          'vmc_action_${item['id'] ?? DateTime.now().millisecondsSinceEpoch}';
+      SyncService.instance.queueAction(
+        SyncAction(
+          id: actId,
+          type: 'VMC_ACTION_CREATE',
+          title: 'Action corrective: ${descCtrl.text.trim()}',
+          endpoint: '/home/actions/vmc',
+          method: 'POST',
+          payload: {
+            'vmc_inspection_item_id': item['id'],
+            'description': descCtrl.text.trim(),
+            'person_in_charge': assignee,
+            'status': 'PENDING',
+          },
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF16A34A),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    "Action corrective enregistrée pour le point ${item['num'] ?? ''} !",
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _pickPhotoForItem(
+      Map<String, dynamic> item, StateSetter setModalState) async {
+    final path = await CameraService.pickImage(context);
+    if (path != null) {
+      setModalState(() {
+        final List<String> current =
+            List<String>.from(item['photos'] as List? ?? []);
+        current.add(path);
+        item['photos'] = current;
+      });
+      setState(() {});
+    }
+  }
+
+  void _removePhotoFromItem(
+      Map<String, dynamic> item, int index, StateSetter setModalState) {
+    setModalState(() {
+      final List<String> current =
+          List<String>.from(item['photos'] as List? ?? []);
+      if (index >= 0 && index < current.length) {
+        current.removeAt(index);
+        item['photos'] = current;
+      }
+    });
+    setState(() {});
+  }
+
+  void _viewFullPhoto(String photoPath) {
+    showDialog(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          alignment: Alignment.topRight,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: photoPath.startsWith('http')
+                  ? Image.network(photoPath, fit: BoxFit.contain)
+                  : Image.file(File(photoPath), fit: BoxFit.contain),
+            ),
+            IconButton(
+              style: IconButton.styleFrom(backgroundColor: Colors.black54),
+              icon: const Icon(Icons.close, color: Colors.white),
+              onPressed: () => Navigator.pop(ctx),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPhotosPreview(
+      Map<String, dynamic> item, StateSetter setModalState,
+      {bool readOnly = false}) {
+    final List<String> photos =
+        List<String>.from(item['photos'] as List? ?? []);
+    if (photos.isEmpty) return const SizedBox.shrink();
+
+    return Padding(
+      padding: const EdgeInsets.only(left: 34, top: 8),
+      child: SizedBox(
+        height: 60,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: photos.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, idx) {
+            final p = photos[idx];
+            return Stack(
+              children: [
+                GestureDetector(
+                  onTap: () => _viewFullPhoto(p),
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(9),
+                      child: p.startsWith('http')
+                          ? Image.network(p, fit: BoxFit.cover)
+                          : Image.file(
+                              File(p),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(
+                                Icons.broken_image,
+                                size: 24,
+                                color: Colors.grey,
+                              ),
+                            ),
+                    ),
+                  ),
+                ),
+                if (!readOnly)
+                  Positioned(
+                    top: 2,
+                    right: 2,
+                    child: GestureDetector(
+                      onTap: () =>
+                          _removePhotoFromItem(item, idx, setModalState),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Color(0xFFDC2626),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(Icons.close,
+                            size: 11, color: Colors.white),
+                      ),
+                    ),
+                  ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionCard(
+      Map<String, dynamic> item, StateSetter setModalState,
+      {bool readOnly = false}) {
+    final action = item['action'] as Map<String, dynamic>?;
+    if (action == null) return const SizedBox.shrink();
+
+    final desc = action['description']?.toString() ?? '';
+    final assignee = action['assignee']?.toString() ?? 'Non assigné';
+
+    return Container(
+      margin: const EdgeInsets.only(left: 34, top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF7ED),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0xFFFED7AA)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.assignment_turned_in,
+                  size: 16, color: Color(0xFFEA580C)),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  "Action Corrective Définie",
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF9A3412),
+                  ),
+                ),
+              ),
+              if (!readOnly) ...[
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.edit,
+                      size: 15, color: Color(0xFF9A3412)),
+                  tooltip: "Modifier l'action",
+                  onPressed: () =>
+                      _showCorrectiveActionDialogForItem(item, setModalState),
+                ),
+                const SizedBox(width: 8),
+                IconButton(
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  icon: const Icon(Icons.delete_outline,
+                      size: 16, color: Color(0xFFDC2626)),
+                  tooltip: "Supprimer l'action",
+                  onPressed: () {
+                    setModalState(() {
+                      item['action'] = null;
+                    });
+                    setState(() {});
+                  },
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            desc,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.person, size: 13, color: Color(0xFF1D4ED8)),
+                const SizedBox(width: 4),
+                Text(
+                  assignee,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -1692,10 +2256,11 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                       ],
                     ),
                     const SizedBox(height: 10),
-                    // Grille sélective des 6 niveaux de 0 à 5
+                    // Grille sélective des 5 niveaux de 1 à 5
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: List.generate(6, (level) {
+                      children: List.generate(5, (index) {
+                        final level = index + 1;
                         final isSelected = selectedGravity == level;
                         final color = _getGravityColor(level);
                         return Expanded(
@@ -2196,6 +2761,43 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                   ),
                 ),
               ),
+              InkWell(
+                onTap: () {
+                  Navigator.pushNamed(
+                    context,
+                    AppRoutes.inspectionsMap,
+                    arguments: {
+                      'type': InspectionType.vmc,
+                      'site': vmc.site,
+                    },
+                  );
+                },
+                borderRadius: BorderRadius.circular(8),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF7ED),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: const Color(0xFFFED7AA)),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      Icon(Icons.map_outlined, size: 13, color: Color(0xFFEA580C)),
+                      SizedBox(width: 4),
+                      Text(
+                        "Carte",
+                        style: TextStyle(
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFFEA580C),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
               const Icon(Icons.calendar_today,
                   size: 14, color: AppColors.textSecondary),
               const SizedBox(width: 6),
@@ -2334,42 +2936,63 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
 
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 5),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      iconData,
-                      size: 16,
-                      color: iconColor,
+                    Row(
+                      children: [
+                        Icon(
+                          iconData,
+                          size: 16,
+                          color: iconColor,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "${item['num'] ?? (index + 1)}. ${item['title']}",
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: badgeBg,
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            label,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: badgeTextColor,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        "${item['num'] ?? (index + 1)}. ${item['title']}",
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textPrimary,
+                    if (item['obs'] != null &&
+                        item['obs'].toString().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 24, top: 2),
+                        child: Text(
+                          "Obs: ${item['obs']}",
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontStyle: FontStyle.italic,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 6),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: badgeBg,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        label,
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: badgeTextColor,
-                        ),
-                      ),
-                    ),
+                    if ((item['photos'] as List?)?.isNotEmpty == true)
+                      _buildPhotosPreview(item, (fn) => setState(fn),
+                          readOnly: true),
                   ],
                 ),
               );
@@ -2400,7 +3023,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                "${vmc.positivePoints} points",
+                "${vmcItems.where((i) => i['answer'] == 'OUI').length} points",
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -2411,19 +3034,76 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           ],
         ),
         const SizedBox(height: 12),
-        _buildConstatCard(
-          title: "Port complet et conforme des EPI",
-          description:
-              "L'ensemble des opérateurs et intervenants sur site portent l'équipement complet conforme aux standards HSSE Galana.",
-          isPositive: true,
-        ),
-        const SizedBox(height: 8),
-        _buildConstatCard(
-          title: "Rétentions et propreté générale",
-          description:
-              "Aires de circulation et bacs de rétention dégagés, matériel d'intervention incendie accessible et vérifié.",
-          isPositive: true,
-        ),
+        if (vmcItems.any((i) => i['answer'] == 'OUI'))
+          ...vmcItems.where((i) => i['answer'] == 'OUI').map((it) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.check_circle,
+                            size: 18, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Point ${it['num']}: ${it['title']}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF166534),
+                                ),
+                              ),
+                              if (it['obs'] != null &&
+                                  it['obs'].toString().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    "Obs: ${it['obs']}",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF15803D),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if ((it['photos'] as List?)?.isNotEmpty == true)
+                      _buildPhotosPreview(it, (fn) => setState(fn),
+                          readOnly: true),
+                  ],
+                ),
+              ),
+            );
+          })
+        else
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Text(
+              "Aucun point évalué conforme pour le moment.",
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
+          ),
 
         const SizedBox(height: 20),
 
@@ -2449,7 +3129,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
-                "${vmc.deviations} écart(s)",
+                "${vmcItems.where((i) => i['answer'] == 'NON').length} écart(s)",
                 style: const TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
@@ -2460,13 +3140,90 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           ],
         ),
         const SizedBox(height: 12),
-        if (vmc.deviations > 0)
-          _buildConstatCard(
-            title: "Mise à la terre ou point d'usure constaté",
-            description:
-                "Continuité ou serrage imparfait identifié lors du contrôle. Action corrective immédiate déclenchée.",
-            isPositive: false,
-          )
+        if (vmcItems.any((i) => i['answer'] == 'NON'))
+          ...vmcItems.where((i) => i['answer'] == 'NON').map((it) {
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: const Color(0xFFFECACA)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(Icons.cancel,
+                            size: 18, color: Color(0xFFDC2626)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                "Écart • Point ${it['num']}: ${it['title']}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  color: Color(0xFF991B1B),
+                                ),
+                              ),
+                              if (it['obs'] != null &&
+                                  it['obs'].toString().isNotEmpty)
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Text(
+                                    "Constat: ${it['obs']}",
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    if ((it['photos'] as List?)?.isNotEmpty == true)
+                      _buildPhotosPreview(it, (fn) => setState(fn),
+                          readOnly: true),
+                    if (it['action'] != null)
+                      _buildActionCard(it, (fn) => setState(fn))
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(left: 26, top: 8),
+                        child: OutlinedButton.icon(
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC2626),
+                            side: const BorderSide(color: Color(0xFFDC2626)),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                          ),
+                          icon: const Icon(Icons.add_task, size: 16),
+                          label: const Text(
+                            "Définir l'action corrective",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onPressed: () => _showCorrectiveActionDialogForItem(
+                            it,
+                            (fn) => setState(fn),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          })
         else
           Container(
             padding: const EdgeInsets.all(14),
@@ -3552,66 +4309,6 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.textPrimary)),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildConstatCard({
-    required String title,
-    required String description,
-    required bool isPositive,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: isPositive ? const Color(0xFFF0FDF4) : const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: isPositive
-              ? const Color(0xFFBBF7D0)
-              : const Color(0xFFFECACA),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(
-            isPositive ? Icons.check_circle : Icons.error,
-            size: 20,
-            color: isPositive
-                ? const Color(0xFF16A34A)
-                : const Color(0xFFDC2626),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
-                    color: isPositive
-                        ? const Color(0xFF166534)
-                        : const Color(0xFF991B1B),
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    height: 1.4,
-                    color: isPositive
-                        ? const Color(0xFF15803D)
-                        : const Color(0xFFB91C1C),
-                  ),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

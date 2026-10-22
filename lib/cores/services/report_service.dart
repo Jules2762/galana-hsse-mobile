@@ -352,8 +352,10 @@ class ReportService {
             if (inspectorObj is Map) {
               final fn = inspectorObj['first_name'] ?? '';
               final ln = inspectorObj['last_name'] ?? '';
-              inspector = "$fn $ln".trim();
-              if (inspector.isEmpty) inspector = 'Inspecteur Galana';
+              final combined = "$fn $ln".trim();
+              inspector = combined.isNotEmpty ? combined : (inspectorObj['name']?.toString() ?? 'Inspecteur Galana');
+            } else if (inspectorObj is String && inspectorObj.isNotEmpty) {
+              inspector = inspectorObj;
             }
 
             // Calcul du score de conformité à partir des sections et items si présents
@@ -442,6 +444,7 @@ class ReportService {
                 category: category,
                 site: site,
                 inspector: inspector,
+                rawInspector: inspectorObj,
                 date: date,
                 conformity: conformity,
                 status: statusStr,

@@ -5,6 +5,7 @@ class ReportModel {
   final String category;
   final String site;
   final String inspector;
+  final dynamic rawInspector;
   final String date;
   final int conformity;
   final String status;
@@ -20,6 +21,7 @@ class ReportModel {
     required this.category,
     required this.site,
     required this.inspector,
+    this.rawInspector,
     required this.date,
     required this.conformity,
     required this.status,
@@ -37,6 +39,7 @@ class ReportModel {
       'category': category,
       'site': site,
       'inspector': inspector,
+      'rawInspector': rawInspector,
       'date': date,
       'conformity': conformity,
       'status': status,
@@ -48,13 +51,25 @@ class ReportModel {
   }
 
   factory ReportModel.fromJson(Map<String, dynamic> json) {
+    String inspectorStr = 'Inspecteur HSSE';
+    final rawInsp = json['rawInspector'] ?? json['inspector'];
+    if (rawInsp is String && rawInsp.isNotEmpty) {
+      inspectorStr = rawInsp;
+    } else if (rawInsp is Map) {
+      final fn = rawInsp['first_name'] ?? '';
+      final ln = rawInsp['last_name'] ?? '';
+      final combined = "$fn $ln".trim();
+      inspectorStr = combined.isNotEmpty ? combined : (rawInsp['name']?.toString() ?? 'Inspecteur HSSE');
+    }
+
     return ReportModel(
       id: json['id'] ?? '1',
       reference: json['reference']?.toString() ?? 'RPT-HSSE',
       title: json['title']?.toString() ?? 'Rapport d\'inspection',
       category: json['category']?.toString() ?? 'Sécurité',
       site: json['site']?.toString() ?? 'Site Galana',
-      inspector: json['inspector']?.toString() ?? 'Inspecteur HSSE',
+      inspector: inspectorStr,
+      rawInspector: rawInsp,
       date: json['date']?.toString() ?? 'Aujourd\'hui',
       conformity: (json['conformity'] is num) ? (json['conformity'] as num).toInt() : 75,
       status: json['status']?.toString() ?? 'Conforme',

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
+import 'package:gestion_hsse/cores/services/personnel_service.dart';
 import 'package:gestion_hsse/views/home/inspection/widgets/inspection_app_bar.dart';
 
 class CorrectiveActionPage extends StatefulWidget {
@@ -16,7 +17,7 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
         "Remplacer le boîtier de verrouillage endommagé et apposer une signalétique haute tension conforme aux normes NF.",
   );
 
-  String department = "Maintenance";
+  String assignee = "ARIMANANA Maherison Jules (Inspecteur HSSE)";
 
   @override
   void dispose() {
@@ -153,44 +154,59 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
                       const SizedBox(height: 24),
 
                       // ====================
-                      // DEPARTEMENT
+                      // RESPONSABLE (PERSONNEL)
                       // ====================
                       const Text(
-                        "Département assigné *",
+                        "Responsable / Personnel assigné *",
                         style: TextStyle(fontWeight: FontWeight.w600),
                       ),
 
                       const SizedBox(height: 8),
 
-                      DropdownButtonFormField<String>(
-                        initialValue: department,
-
-                        decoration: const InputDecoration(),
-
-                        items: const [
-                          DropdownMenuItem(
-                            value: "Maintenance",
-                            child: Text("Maintenance"),
-                          ),
-
-                          DropdownMenuItem(
-                            value: "Exploitation",
-                            child: Text("Exploitation"),
-                          ),
-
-                          DropdownMenuItem(value: "HSSE", child: Text("HSSE")),
-
-                          DropdownMenuItem(
-                            value: "Logistique",
-                            child: Text("Logistique"),
-                          ),
-                        ],
-
-                        onChanged: (value) {
-                          setState(() {
-                            department = value!;
-                          });
+                      InkWell(
+                        onTap: () async {
+                          final picked = await PersonnelService.showPersonnelPicker(
+                            context,
+                            currentName: assignee,
+                          );
+                          if (picked != null) {
+                            setState(() {
+                              assignee = "${picked.fullName} (${picked.fonction})";
+                            });
+                          }
                         },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.border),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.person, color: Color(0xFF1D4ED8), size: 20),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  assignee.isNotEmpty
+                                      ? assignee
+                                      : "Sélectionner un responsable du personnel...",
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: assignee.isNotEmpty
+                                        ? FontWeight.w600
+                                        : FontWeight.normal,
+                                    color: assignee.isNotEmpty
+                                        ? AppColors.textPrimary
+                                        : AppColors.textSecondary,
+                                  ),
+                                ),
+                              ),
+                              const Icon(Icons.keyboard_arrow_down, color: AppColors.textSecondary),
+                            ],
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -217,9 +233,7 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
                     final desc = descriptionController.text.trim();
                     final actionData = {
                       'description': desc,
-                      'department': department,
-                      'assignee': 'Marie Razafi (Superviseur)',
-                      'priority': 'Haute',
+                      'assignee': assignee,
                     };
 
                     SyncService.instance.queueAction(

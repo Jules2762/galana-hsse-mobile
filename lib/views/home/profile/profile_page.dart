@@ -58,13 +58,12 @@ class ProfilePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = ApiClient.currentUser;
-    final String fullName = user?['name']?.toString() ??
-        ("${user?['first_name'] ?? 'Jules'} ${user?['last_name'] ?? 'ARIMANANA'}").trim();
-    final String email = user?['email']?.toString() ?? "julesari_ext@galana.mg";
+    final String fullName = ApiClient.currentUserName;
+    final String email = user?['email']?.toString() ?? "";
     final String role = user?['role']?.toString() ?? "Inspecteur HSSE";
-    final String department = user?['department']?.toString() ?? "Opérations & Sûreté";
-    final String function = user?['job_title']?.toString() ?? "Superviseur Terrain HSSE";
-    final String phone = user?['phone']?.toString() ?? "+261 34 12 345 67";
+    final String department = user?['department']?.toString() ?? "Opérations & Dépôt";
+    final String function = user?['job_title']?.toString() ?? (user?['job']?.toString() ?? "Inspecteur HSSE");
+    final String phone = user?['phone']?.toString() ?? "";
 
     String initials = "GA";
     final parts = fullName.split(' ');

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/models/report_model.dart';
 import 'package:gestion_hsse/cores/services/report_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
@@ -62,9 +63,12 @@ class _RapportPageState extends State<RapportPage> {
         categoryFilter: _selectedCategory,
         conformityFilter: _selectedConformity,
       );
+      final assignedItems = items
+          .where((r) => ApiClient.isAssignedToCurrentUser(r.rawInspector ?? r.inspector, r.id))
+          .toList();
       if (mounted) {
         setState(() {
-          _reports = items;
+          _reports = assignedItems;
           _isLoading = false;
         });
       }
@@ -201,24 +205,60 @@ class _RapportPageState extends State<RapportPage> {
             // ============================================
             // FILTRES PAR PÉRIODE & CATÉGORIE
             // ============================================
-            // Période
+            // Période & Assignation
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
-                children: List.generate(
-                  _periodFilters.length,
-                  (index) => Padding(
+                children: [
+                  // Badge Mes assignations
+                  Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: ReportFilterChip(
-                      label: _periodFilters[index],
-                      selected: _selectedPeriod == index,
-                      onTap: () {
-                        setState(() => _selectedPeriod = index);
-                        _loadReports();
-                      },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFBFDBFE),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.person_pin,
+                            size: 15,
+                            color: Color(0xFF1D4ED8),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            "Mes assignations (${_reports.length})",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: Color(0xFF1D4ED8),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
+                  ...List.generate(
+                    _periodFilters.length,
+                    (index) => Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: ReportFilterChip(
+                        label: _periodFilters[index],
+                        selected: _selectedPeriod == index,
+                        onTap: () {
+                          setState(() => _selectedPeriod = index);
+                          _loadReports();
+                        },
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
 
@@ -327,7 +367,7 @@ class _RapportPageState extends State<RapportPage> {
                     const Icon(Icons.description_outlined, size: 48, color: Color(0xFFCBD5E1)),
                     const SizedBox(height: 12),
                     const Text(
-                      "Aucun rapport trouvé",
+                      "Aucun rapport assigné",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -336,7 +376,7 @@ class _RapportPageState extends State<RapportPage> {
                     ),
                     const SizedBox(height: 6),
                     const Text(
-                      "Aucun rapport ne correspond à vos critères de recherche ou filtres actuels.",
+                      "Aucun rapport disponible pour vos assignations ou critères de recherche actuels.",
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
                     ),

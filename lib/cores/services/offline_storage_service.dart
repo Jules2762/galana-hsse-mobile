@@ -17,6 +17,7 @@ class OfflineStorageService {
   static const String _keyEmergencyContacts = 'offline_cached_emergency_contacts';
   static const String _keyEmergencySites = 'offline_cached_emergency_sites';
   static const String _keyVmcDetailPrefix = 'offline_cached_vmc_detail_';
+  static const String _keyChecklistDetailPrefix = 'offline_cached_checklist_detail_';
 
 
   // ==========================================
@@ -172,6 +173,26 @@ class OfflineStorageService {
       }
       await cacheChecklists(items);
     } catch (_) {}
+  }
+
+  /// Sauvegarde les détails complets d'une Checklist en local
+  static Future<void> cacheChecklistDetail(dynamic id, Map<String, dynamic> data) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('$_keyChecklistDetailPrefix$id', jsonEncode(data));
+    } catch (_) {}
+  }
+
+  /// Récupère les détails complets d'une Checklist en local
+  static Future<Map<String, dynamic>?> getCachedChecklistDetail(dynamic id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString('$_keyChecklistDetailPrefix$id');
+      if (raw != null && raw.isNotEmpty) {
+        return jsonDecode(raw) as Map<String, dynamic>;
+      }
+    } catch (_) {}
+    return null;
   }
 
   // ==========================================

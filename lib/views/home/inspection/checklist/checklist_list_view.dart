@@ -93,7 +93,7 @@ class _ChecklistListViewState extends State<ChecklistListView> {
 
   List<ChecklistItemData> get filteredChecklists {
     return checklistItems.where((item) {
-      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(item.inspector)) {
+      if (!ApiClient.isAssignedToCurrentUser(item.inspector, item.id)) {
         return false;
       }
 
@@ -158,46 +158,37 @@ class _ChecklistListViewState extends State<ChecklistListView> {
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
-                      // Chip Attribuées à moi
+                      // Badge Mes assignations
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: InkWell(
-                          onTap: () {
-                            setState(() {
-                              onlyAssignedToMe = !onlyAssignedToMe;
-                            });
-                          },
-                          borderRadius: BorderRadius.circular(20),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                            decoration: BoxDecoration(
-                              color: onlyAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFFEFF6FF),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: onlyAssignedToMe ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE),
-                                width: onlyAssignedToMe ? 1.5 : 1.0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFEFF6FF),
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: const Color(0xFFBFDBFE),
+                              width: 1.0,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.person_pin,
+                                size: 15,
+                                color: Color(0xFF1D4ED8),
                               ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  onlyAssignedToMe ? Icons.check_circle : Icons.person_pin,
-                                  size: 15,
-                                  color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                              const SizedBox(width: 5),
+                              Text(
+                                "Mes assignations ($assignedToMeCount)",
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF1D4ED8),
                                 ),
-                                const SizedBox(width: 5),
-                                Text(
-                                  "Attribuées à moi ($assignedToMeCount)",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
-                                  ),
-                                ),
-                              ],
-                            ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
@@ -239,23 +230,19 @@ class _ChecklistListViewState extends State<ChecklistListView> {
                       children: [
                         Icon(Icons.fact_check_outlined, size: 48, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
-                        Text(
-                          onlyAssignedToMe
-                              ? "Aucune inspection attribuée"
-                              : "Aucune checklist trouvée",
-                          style: const TextStyle(
+                        const Text(
+                          "Aucune inspection attribuée",
+                          style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
                             color: AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),
-                        Text(
-                          onlyAssignedToMe
-                              ? "Aucune inspection n'est actuellement assignée à votre profil."
-                              : "Essayez de modifier votre recherche ou le filtre de statut.",
+                        const Text(
+                          "Aucune checklist n'est actuellement assignée à votre profil.",
                           textAlign: TextAlign.center,
-                          style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                          style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
                         ),
                       ],
                     ),

@@ -371,7 +371,7 @@ class _VmcListViewState extends State<VmcListView> {
 
   List<VmcItemData> get filteredVmcList {
     return vmcList.where((item) {
-      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(item.inspector)) {
+      if (!ApiClient.isAssignedToCurrentUser(item.inspector, item.id)) {
         return false;
       }
 
@@ -453,9 +453,9 @@ class _VmcListViewState extends State<VmcListView> {
   Widget build(BuildContext context) {
     final filtered = filteredVmcList;
     final inProgressCount =
-        vmcList.where((v) => v.status.toLowerCase() == 'en cours').length;
+        filteredVmcList.where((v) => v.status.toLowerCase() == 'en cours').length;
     final closedCount =
-        vmcList.where((v) => v.status.toLowerCase() == 'clôturée').length;
+        filteredVmcList.where((v) => v.status.toLowerCase() == 'clôturée' || v.status.toLowerCase() == 'terminée').length;
 
     return RefreshIndicator(
       onRefresh: _loadVmcs,
@@ -526,43 +526,34 @@ class _VmcListViewState extends State<VmcListView> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: InkWell(
-                      onTap: () {
-                        setState(() {
-                          onlyAssignedToMe = !onlyAssignedToMe;
-                        });
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                        decoration: BoxDecoration(
-                          color: onlyAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(
-                            color: onlyAssignedToMe ? const Color(0xFF1D4ED8) : const Color(0xFFBFDBFE),
-                            width: onlyAssignedToMe ? 1.5 : 1.0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: const Color(0xFFBFDBFE),
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.person_pin,
+                            size: 15,
+                            color: Color(0xFF1D4ED8),
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              onlyAssignedToMe ? Icons.check_circle : Icons.person_pin,
-                              size: 15,
-                              color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
+                          const SizedBox(width: 5),
+                          Text(
+                            "Mes assignations ($assignedToMeCount)",
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1D4ED8),
                             ),
-                            const SizedBox(width: 5),
-                            Text(
-                              "Attribuées à moi ($assignedToMeCount)",
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: onlyAssignedToMe ? Colors.white : const Color(0xFF1D4ED8),
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -598,7 +589,7 @@ class _VmcListViewState extends State<VmcListView> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildStatColumn("${vmcList.length}", "Total VMC",
+                  _buildStatColumn("${filteredVmcList.length}", "Mes VMC",
                       AppColors.textPrimary),
                   Container(
                       width: 1, height: 28, color: Colors.grey.shade200),
@@ -667,7 +658,7 @@ class _VmcListViewState extends State<VmcListView> {
                         size: 48, color: Colors.grey.shade400),
                     const SizedBox(height: 12),
                     const Text(
-                      "Aucune visite VMC trouvée",
+                      "Aucune visite VMC attribuée",
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
@@ -676,7 +667,7 @@ class _VmcListViewState extends State<VmcListView> {
                     ),
                     const SizedBox(height: 4),
                     const Text(
-                      "Essayez de modifier votre recherche ou le filtre de type.",
+                      "Aucune visite VMC n'est actuellement assignée à votre profil.",
                       textAlign: TextAlign.center,
                       style: TextStyle(
                           fontSize: 13, color: AppColors.textSecondary),

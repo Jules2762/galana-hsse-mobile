@@ -122,6 +122,72 @@ class ChecklistService {
     }).toList();
   }
 
+  /// Récupère le détail complet d'une Checklist (API ou cache hors-ligne)
+  static Future<Map<String, dynamic>?> getChecklistDetail(dynamic id) async {
+    try {
+      await ApiClient.ensureAuthenticated();
+      final response = await ApiClient.dio.get('/home/checklists/checklists/$id');
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data['data'] ?? response.data;
+        if (data is Map<String, dynamic>) {
+          await OfflineStorageService.cacheChecklistDetail(id, data);
+          return data;
+        }
+      }
+    } catch (_) {}
+
+    // Repli hors-ligne
+    return await OfflineStorageService.getCachedChecklistDetail(id);
+  }
+
+  /// Met à jour le statut d'une checklist
+  static Future<bool> updateStatus(dynamic id, String status) async {
+    String apiStatus = status;
+    final lower = status.toLowerCase();
+    if (lower.contains('clôtur') || lower.contains('clotur') || lower == 'completed' || lower == 'terminée') {
+      apiStatus = 'COMPLETED';
+    } else if (lower.contains('cours') || lower == 'in_progress') {
+      apiStatus = 'IN_PROGRESS';
+    } else if (lower.contains('planif') || lower == 'draft') {
+      apiStatus = 'DRAFT';
+    }
+
+    final checklistId = id?.toString() ?? '1';
+    final action = SyncAction(
+      id: 'checklist_status_${checklistId}_${DateTime.now().millisecondsSinceEpoch}',
+      type: 'CHECKLIST_STATUS',
+      title: 'Mise à jour statut Checklist #$checklistId ($apiStatus)',
+      endpoint: '/home/checklists/checklists/$checklistId',
+      method: 'PUT',
+      payload: {'status': apiStatus},
+      createdAt: DateTime.now(),
+    );
+
+    await SyncService.instance.queueAction(action);
+    return true;
+  }
+
+  /// Sauvegarde des données d'évaluation de la checklist
+  static Future<bool> updateChecklist(dynamic id, Map<String, dynamic> payload) async {
+    final current = await OfflineStorageService.getCachedChecklistDetail(id) ?? {};
+    current.addAll(payload);
+    await OfflineStorageService.cacheChecklistDetail(id, current);
+
+    final checklistId = id?.toString() ?? '1';
+    final action = SyncAction(
+      id: 'checklist_eval_${checklistId}_${DateTime.now().millisecondsSinceEpoch}',
+      type: 'CHECKLIST_UPDATE',
+      title: 'Évaluation Checklist #$checklistId',
+      endpoint: '/home/checklists/checklists/$checklistId',
+      method: 'PUT',
+      payload: payload,
+      createdAt: DateTime.now(),
+    );
+
+    await SyncService.instance.queueAction(action);
+    return true;
+  }
+
   /// Clôture d'une checklist avec persistance hors-ligne et auto-synchro en ligne
   static Future<bool> completeChecklist(
     ChecklistItemData item, {
