@@ -162,6 +162,7 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final filtered = _filteredInspections;
 
     // Construction des markers
@@ -187,7 +188,7 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                 width: isSelected ? 46 : 36,
                 height: isSelected ? 46 : 36,
                 decoration: BoxDecoration(
-                  color: isSelected ? color : Colors.white,
+                  color: isSelected ? color : (isDark ? const Color(0xFF1E293B) : Colors.white),
                   shape: BoxShape.circle,
                   border: Border.all(
                     color: isSelected ? Colors.white : color,
@@ -243,7 +244,9 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'mg.galana.gestion_hsse',
+              userAgentPackageName: 'com.example.mobile',
+              maxZoom: 19,
+              fallbackUrl: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
             ),
 
             // Halo de rayon autour de l'inspection sélectionnée
@@ -292,12 +295,12 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                     child: Container(
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: isDark ? const Color(0xFF1E293B) : Colors.white,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withValues(alpha: 0.08),
+                            color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -305,12 +308,13 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                       ),
                       child: TextField(
                         controller: _searchCtrl,
+                        style: TextStyle(fontSize: 13, color: isDark ? Colors.white : AppColors.textPrimary),
                         decoration: InputDecoration(
                           hintText: "Rechercher site, référence, titre...",
-                          hintStyle: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary),
-                          prefixIcon: const Icon(Icons.search,
-                              size: 18, color: AppColors.textSecondary),
+                          hintStyle: TextStyle(
+                              fontSize: 12, color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary),
+                          prefixIcon: Icon(Icons.search,
+                              size: 18, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                           suffixIcon: _searchQuery.isNotEmpty
                               ? IconButton(
                                   icon: const Icon(Icons.clear, size: 16),
@@ -339,12 +343,12 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                         height: 44,
                         padding: const EdgeInsets.symmetric(horizontal: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.08),
+                              color: Colors.black.withValues(alpha: isDark ? 0.25 : 0.08),
                               blurRadius: 8,
                               offset: const Offset(0, 2),
                             ),
@@ -352,16 +356,16 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
-                          children: const [
-                            Icon(Icons.view_list_rounded,
+                          children: [
+                            const Icon(Icons.view_list_rounded,
                                 size: 18, color: AppColors.primary),
-                            SizedBox(width: 6),
+                            const SizedBox(width: 6),
                             Text(
                               "Liste",
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
                               ),
                             ),
                           ],
@@ -382,7 +386,7 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                     _buildTypeChip(
                       label: "Toutes (${_allInspections.length})",
                       type: null,
-                      color: AppColors.textPrimary,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                     const SizedBox(width: 6),
                     _buildTypeChip(
@@ -422,8 +426,8 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
               // Bouton sélecteur de région / ville
               FloatingActionButton.small(
                 heroTag: 'fab_city_jump',
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.textPrimary,
+                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
                 elevation: 3,
                 tooltip: "Aller à une région",
                 onPressed: _showCityPickerBottomSheet,
@@ -434,8 +438,8 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
               // Zoom In
               FloatingActionButton.small(
                 heroTag: 'fab_zoom_in',
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.textPrimary,
+                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
                 elevation: 3,
                 onPressed: () {
                   final cur = _mapController.camera.zoom;
@@ -448,8 +452,8 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
               // Zoom Out
               FloatingActionButton.small(
                 heroTag: 'fab_zoom_out',
-                backgroundColor: Colors.white,
-                foregroundColor: AppColors.textPrimary,
+                backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
                 elevation: 3,
                 onPressed: () {
                   final cur = _mapController.camera.zoom;
@@ -494,6 +498,7 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
     IconData? icon,
   }) {
     final isSelected = _selectedType == type;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return InkWell(
       onTap: () {
@@ -506,14 +511,14 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? color : Colors.white,
+          color: isSelected ? color : (isDark ? const Color(0xFF1E293B) : Colors.white),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? color : const Color(0xFFCBD5E1),
+            color: isSelected ? color : (isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.06),
               blurRadius: 4,
               offset: const Offset(0, 1),
             ),
@@ -535,7 +540,7 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.bold,
-                color: isSelected ? Colors.white : AppColors.textPrimary,
+                color: isSelected ? Colors.white : (isDark ? Colors.white : AppColors.textPrimary),
               ),
             ),
           ],
@@ -545,15 +550,16 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
   }
 
   Widget _buildInspectionPreviewCard(InspectionMapItem item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: item.typeColor.withValues(alpha: 0.3)),
+        border: Border.all(color: item.typeColor.withValues(alpha: isDark ? 0.45 : 0.3)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.14),
+            color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.14),
             blurRadius: 18,
             offset: const Offset(0, 6),
           ),
@@ -610,7 +616,7 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
               IconButton(
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints(),
-                icon: const Icon(Icons.close, size: 18, color: Colors.grey),
+                icon: Icon(Icons.close, size: 18, color: isDark ? Colors.white60 : Colors.grey),
                 onPressed: () => setState(() => _selectedInspection = null),
               ),
             ],
@@ -620,10 +626,10 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
           // Titre de l'inspection
           Text(
             item.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: isDark ? Colors.white : AppColors.textPrimary,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -638,10 +644,10 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
               Expanded(
                 child: Text(
                   "${item.site} • GPS: ${item.latitude.toStringAsFixed(4)}, ${item.longitude.toStringAsFixed(4)}",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
+                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -654,22 +660,22 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
           // Inspecteur & Date
           Row(
             children: [
-              const Icon(Icons.person_outline,
-                  size: 14, color: AppColors.textSecondary),
+              Icon(Icons.person_outline,
+                  size: 14, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
               const SizedBox(width: 4),
               Text(
                 item.inspector,
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(
+                    fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
               ),
               const SizedBox(width: 12),
-              const Icon(Icons.calendar_today,
-                  size: 12, color: AppColors.textSecondary),
+              Icon(Icons.calendar_today,
+                  size: 12, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
               const SizedBox(width: 4),
               Text(
                 item.date,
-                style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(
+                    fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
               ),
               if (item.conformityRate != null) ...[
                 const Spacer(),
@@ -715,8 +721,8 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                 flex: 2,
                 child: OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.textPrimary,
-                    side: const BorderSide(color: Color(0xFFCBD5E1)),
+                    foregroundColor: isDark ? Colors.white : AppColors.textPrimary,
+                    side: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -739,8 +745,10 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
   }
 
   void _showCityPickerBottomSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -752,12 +760,16 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
-                children: const [
-                  Icon(Icons.explore, color: AppColors.primary, size: 20),
-                  SizedBox(width: 8),
+                children: [
+                  const Icon(Icons.explore, color: AppColors.primary, size: 20),
+                  const SizedBox(width: 8),
                   Text(
                     "Centrer la carte sur une région",
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
                   ),
                 ],
               ),
@@ -767,7 +779,14 @@ class _InspectionsMapViewState extends State<InspectionsMapView> {
                 runSpacing: 8,
                 children: _cityCenters.entries.map((e) {
                   return ActionChip(
-                    label: Text(e.key),
+                    backgroundColor: isDark ? const Color(0xFF0F172A) : null,
+                    side: isDark ? const BorderSide(color: Color(0xFF334155)) : null,
+                    label: Text(
+                      e.key,
+                      style: TextStyle(
+                        color: isDark ? Colors.white : null,
+                      ),
+                    ),
                     onPressed: () {
                       Navigator.pop(ctx);
                       _mapController.move(

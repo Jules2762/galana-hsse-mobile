@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/checklist_service.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
@@ -30,7 +31,12 @@ class ChecklistItemData {
 }
 
 class ChecklistListView extends StatefulWidget {
-  const ChecklistListView({super.key});
+  final ValueChanged<int>? onCountLoaded;
+
+  const ChecklistListView({
+    super.key,
+    this.onCountLoaded,
+  });
 
   @override
   State<ChecklistListView> createState() => _ChecklistListViewState();
@@ -85,6 +91,7 @@ class _ChecklistListViewState extends State<ChecklistListView> {
         checklistItems = items;
         isLoading = false;
       });
+      widget.onCountLoaded?.call(items.length);
     }
   }
 
@@ -93,7 +100,7 @@ class _ChecklistListViewState extends State<ChecklistListView> {
 
   List<ChecklistItemData> get filteredChecklists {
     return checklistItems.where((item) {
-      if (!ApiClient.isAssignedToCurrentUser(item.inspector, item.id)) {
+      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(item.inspector, item.id)) {
         return false;
       }
 
@@ -115,6 +122,7 @@ class _ChecklistListViewState extends State<ChecklistListView> {
     return ListenableBuilder(
       listenable: SyncService.instance,
       builder: (context, _) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         final filtered = filteredChecklists;
 
         return RefreshIndicator(
@@ -135,7 +143,7 @@ class _ChecklistListViewState extends State<ChecklistListView> {
                     });
                   },
                   decoration: InputDecoration(
-                    hintText: "Rechercher une checklist ou un site...",
+                    hintText: context.l10n.searchChecklist,
                     prefixIcon: const Icon(Icons.search, size: 20),
                     suffixIcon: searchQuery.isNotEmpty
                         ? IconButton(
@@ -161,34 +169,50 @@ class _ChecklistListViewState extends State<ChecklistListView> {
                       // Badge Mes assignations
                       Padding(
                         padding: const EdgeInsets.only(right: 8),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: const Color(0xFFBFDBFE),
-                              width: 1.0,
+                        child: InkWell(
+                          onTap: () {
+                            setState(() {
+                              onlyAssignedToMe = !onlyAssignedToMe;
+                            });
+                          },
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                            decoration: BoxDecoration(
+                              color: onlyAssignedToMe
+                                  ? const Color(0xFF1D4ED8)
+                                  : (isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF)),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: onlyAssignedToMe
+                                    ? const Color(0xFF1D4ED8)
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                                width: 1.0,
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.person_pin,
-                                size: 15,
-                                color: Color(0xFF1D4ED8),
-                              ),
-                              const SizedBox(width: 5),
-                              Text(
-                                "Mes assignations ($assignedToMeCount)",
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF1D4ED8),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.person_pin,
+                                  size: 15,
+                                  color: onlyAssignedToMe
+                                      ? Colors.white
+                                      : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(width: 5),
+                                Text(
+                                  "${context.l10n.assignedToMe} ($assignedToMeCount)",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                    color: onlyAssignedToMe
+                                        ? Colors.white
+                                        : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -230,12 +254,12 @@ class _ChecklistListViewState extends State<ChecklistListView> {
                       children: [
                         Icon(Icons.fact_check_outlined, size: 48, color: Colors.grey.shade400),
                         const SizedBox(height: 12),
-                        const Text(
-                          "Aucune inspection attribuée",
+                        Text(
+                          context.l10n.noChecklistsFound,
                           style: TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,
-                            color: AppColors.textPrimary,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
                           ),
                         ),
                         const SizedBox(height: 4),

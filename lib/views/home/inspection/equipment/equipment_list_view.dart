@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/equipment_service.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
@@ -26,6 +27,7 @@ class EquipmentItemData {
   final String valueType;
   final List<String> attachments;
   final String? comment;
+  final Map<String, dynamic>? action;
 
   const EquipmentItemData({
     this.id,
@@ -45,6 +47,7 @@ class EquipmentItemData {
     this.valueType = "number",
     this.attachments = const [],
     this.comment,
+    this.action,
   });
 
   EquipmentItemData copyWith({
@@ -65,6 +68,7 @@ class EquipmentItemData {
     String? valueType,
     List<String>? attachments,
     String? comment,
+    Map<String, dynamic>? action,
   }) {
     return EquipmentItemData(
       id: id ?? this.id,
@@ -84,6 +88,7 @@ class EquipmentItemData {
       valueType: valueType ?? this.valueType,
       attachments: attachments ?? this.attachments,
       comment: comment ?? this.comment,
+      action: action ?? this.action,
     );
   }
 
@@ -108,6 +113,7 @@ class EquipmentItemData {
       'valueType': valueType,
       'attachments': attachments,
       'comment': comment,
+      'action': action,
     };
   }
 
@@ -135,12 +141,15 @@ class EquipmentItemData {
       }
     }
 
+    final rawType = json['type']?.toString();
+    final formattedType = EquipmentService.formatEquipmentType(rawType);
+
     return EquipmentItemData(
       id: id,
       monitoringId: json['monitoringId'] ?? json['monitoring_id'],
       tagNumber: tag,
       designation: designation,
-      type: json['type']?.toString() ?? 'Extincteur P50',
+      type: formattedType,
       site: json['site']?.toString() ?? json['site_name']?.toString() ?? 'Station Galana',
       location: json['location']?.toString() ?? 'Piste distribution',
       lastControlDate: json['lastControlDate']?.toString() ?? json['date']?.toString() ?? '16 Oct 2026',
@@ -153,6 +162,7 @@ class EquipmentItemData {
       valueType: json['valueType']?.toString() ?? 'number',
       attachments: photoUrls,
       comment: json['comment']?.toString(),
+      action: json['action'] is Map ? Map<String, dynamic>.from(json['action'] as Map) : null,
     );
   }
 }
@@ -307,10 +317,13 @@ class EquipmentMonitoringListView extends StatefulWidget {
   final Function(EquipmentMonitoringData)? onMonitoringTap;
   final Function(EquipmentItemData)? onEquipmentTap;
 
+  final ValueChanged<int>? onCountLoaded;
+
   const EquipmentMonitoringListView({
     super.key,
     this.onMonitoringTap,
     this.onEquipmentTap,
+    this.onCountLoaded,
   });
 
   @override
@@ -372,6 +385,7 @@ class _EquipmentMonitoringListViewState
         monitoringList = items;
         isLoading = false;
       });
+      widget.onCountLoaded?.call(items.length);
     }
   }
 
@@ -380,7 +394,7 @@ class _EquipmentMonitoringListViewState
 
   List<EquipmentMonitoringData> get filteredMonitorings {
     return monitoringList.where((m) {
-      if (!ApiClient.isAssignedToCurrentUser(m.inspector, m.id)) {
+      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(m.inspector, m.id)) {
         return false;
       }
 
@@ -422,8 +436,11 @@ class _EquipmentMonitoringListViewState
 
   /// Dialogue modal pour planifier un nouveau suivi matériel (0 équipement à la création)
   void _showPlanMonitoringSheet() async {
-    final siteNames = await EquipmentService.getSiteNames();
-    String selectedSite = siteNames.isNotEmpty ? siteNames.first : "Station Majunga";
+    final sites = await EquipmentService.getDetailedSites();
+    SiteItem selectedSiteItem = sites.isNotEmpty
+        ? sites.first
+        : const SiteItem(name: "Station Majunga", locality: "Mahajanga", province: "Boeny");
+    String selectedSite = selectedSiteItem.name;
     String selectedStatus = "En cours";
     final inspectorController = TextEditingController(
       text: ApiClient.currentUser?['name']?.toString() ?? "ARIMANANA Jules",
@@ -434,6 +451,7 @@ class _EquipmentMonitoringListViewState
     DateTime selectedDate = now;
 
     if (!mounted) return;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
@@ -452,9 +470,9 @@ class _EquipmentMonitoringListViewState
                 top: 20,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
               ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
                 child: SingleChildScrollView(
@@ -467,7 +485,7 @@ class _EquipmentMonitoringListViewState
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
+                            color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
@@ -480,14 +498,14 @@ class _EquipmentMonitoringListViewState
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
+                              color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(Icons.add_task_rounded,
                                 color: AppColors.primary, size: 24),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -496,14 +514,14 @@ class _EquipmentMonitoringListViewState
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 17,
-                                    color: AppColors.textPrimary,
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                                 Text(
                                   "Création de la session (les matériels sont ajoutés sur place)",
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.textSecondary,
+                                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -513,53 +531,134 @@ class _EquipmentMonitoringListViewState
                       ),
 
                       const SizedBox(height: 16),
-                      const Divider(height: 1),
+                      Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       const SizedBox(height: 16),
 
-                      // 1. Choix de la Station / Site
-                      const Text(
-                        "Site / Station Galana *",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
-                        ),
+                      // 1. Choix de la Station / Site (Sélecteur convivial avec recherche)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            "Site / Station Galana *",
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final picked = await EquipmentService.showSitePicker(
+                                ctx,
+                                currentSite: selectedSite,
+                              );
+                              if (picked != null) {
+                                setModalState(() {
+                                  selectedSite = picked.name;
+                                  selectedSiteItem = picked;
+                                });
+                              }
+                            },
+                            style: TextButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
+                            child: const Text(
+                              "Changer",
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary),
+                            ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: siteNames.contains(selectedSite)
-                                ? selectedSite
-                                : (siteNames.isNotEmpty ? siteNames.first : null),
-                            isExpanded: true,
-                            items: siteNames.map((s) {
-                              return DropdownMenuItem(
-                                value: s,
-                                child: Text(s, style: const TextStyle(fontSize: 13)),
-                              );
-                            }).toList(),
-                            onChanged: (val) {
-                              if (val != null) setModalState(() => selectedSite = val);
-                            },
+                      InkWell(
+                        onTap: () async {
+                          final picked = await EquipmentService.showSitePicker(
+                            ctx,
+                            currentSite: selectedSite,
+                          );
+                          if (picked != null) {
+                            setModalState(() {
+                              selectedSite = picked.name;
+                              selectedSiteItem = picked;
+                            });
+                          }
+                        },
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1)),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: const Icon(Icons.local_gas_station_rounded,
+                                    size: 20, color: Color(0xFF1D4ED8)),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      selectedSite.isNotEmpty
+                                          ? selectedSite
+                                          : "Sélectionner une station Galana...",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: selectedSite.isNotEmpty
+                                            ? (isDark ? Colors.white : const Color(0xFF0F172A))
+                                            : (isDark ? const Color(0xFF64748B) : Colors.grey.shade400),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      [
+                                        if (selectedSiteItem.locality != null && selectedSiteItem.locality!.isNotEmpty)
+                                          selectedSiteItem.locality,
+                                        if (selectedSiteItem.province != null && selectedSiteItem.province!.isNotEmpty)
+                                          selectedSiteItem.province,
+                                      ].isNotEmpty
+                                          ? [
+                                              if (selectedSiteItem.locality != null && selectedSiteItem.locality!.isNotEmpty)
+                                                selectedSiteItem.locality,
+                                              if (selectedSiteItem.province != null && selectedSiteItem.province!.isNotEmpty)
+                                                selectedSiteItem.province,
+                                            ].join(" • ")
+                                          : "Station Galana Madagascar",
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(Icons.search_rounded,
+                                  size: 20, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
+                            ],
                           ),
                         ),
                       ),
                       const SizedBox(height: 14),
 
                       // 2. Date d'inspection
-                      const Text(
+                      Text(
                         "Date du contrôle *",
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -578,9 +677,9 @@ class _EquipmentMonitoringListViewState
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade50,
+                            color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.grey.shade300),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
                           ),
                           child: Row(
                             children: [
@@ -588,7 +687,11 @@ class _EquipmentMonitoringListViewState
                               const SizedBox(width: 10),
                               Text(
                                 "${selectedDate.day} Oct ${selectedDate.year}",
-                                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
                               ),
                             ],
                           ),
@@ -597,33 +700,44 @@ class _EquipmentMonitoringListViewState
                       const SizedBox(height: 14),
 
                       // 3. Inspecteur
-                      const Text(
+                      Text(
                         "Inspecteur HSSE *",
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: inspectorController,
+                        style: TextStyle(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                         decoration: InputDecoration(
-                          prefixIcon: const Icon(Icons.person_outline, size: 20),
+                          prefixIcon: Icon(Icons.person_outline, size: 20, color: isDark ? const Color(0xFF94A3B8) : null),
+                          filled: isDark,
+                          fillColor: isDark ? const Color(0xFF0F172A) : null,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           hintText: "Nom de l'inspecteur",
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 14),
 
                       // 4. Statut initial
-                      const Text(
+                      Text(
                         "Statut initial *",
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -635,10 +749,12 @@ class _EquipmentMonitoringListViewState
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: selectedStatus == "Planifiée" ? const Color(0xFFFEF3C7) : Colors.grey.shade100,
+                                  color: selectedStatus == "Planifiée"
+                                      ? (isDark ? const Color(0xFFD97706).withValues(alpha: 0.25) : const Color(0xFFFEF3C7))
+                                      : (isDark ? const Color(0xFF0F172A) : Colors.grey.shade100),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: selectedStatus == "Planifiée" ? const Color(0xFFD97706) : Colors.grey.shade300,
+                                    color: selectedStatus == "Planifiée" ? const Color(0xFFD97706) : (isDark ? const Color(0xFF334155) : Colors.grey.shade300),
                                   ),
                                 ),
                                 alignment: Alignment.center,
@@ -647,7 +763,7 @@ class _EquipmentMonitoringListViewState
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
-                                    color: selectedStatus == "Planifiée" ? const Color(0xFFB45309) : Colors.grey.shade700,
+                                    color: selectedStatus == "Planifiée" ? const Color(0xFFF59E0B) : (isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700),
                                   ),
                                 ),
                               ),
@@ -660,10 +776,12 @@ class _EquipmentMonitoringListViewState
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 10),
                                 decoration: BoxDecoration(
-                                  color: selectedStatus == "En cours" ? const Color(0xFFDBEAFE) : Colors.grey.shade100,
+                                  color: selectedStatus == "En cours"
+                                      ? (isDark ? const Color(0xFF2563EB).withValues(alpha: 0.25) : const Color(0xFFDBEAFE))
+                                      : (isDark ? const Color(0xFF0F172A) : Colors.grey.shade100),
                                   borderRadius: BorderRadius.circular(10),
                                   border: Border.all(
-                                    color: selectedStatus == "En cours" ? const Color(0xFF2563EB) : Colors.grey.shade300,
+                                    color: selectedStatus == "En cours" ? const Color(0xFF2563EB) : (isDark ? const Color(0xFF334155) : Colors.grey.shade300),
                                   ),
                                 ),
                                 alignment: Alignment.center,
@@ -672,7 +790,7 @@ class _EquipmentMonitoringListViewState
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
-                                    color: selectedStatus == "En cours" ? const Color(0xFF1D4ED8) : Colors.grey.shade700,
+                                    color: selectedStatus == "En cours" ? const Color(0xFF60A5FA) : (isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700),
                                   ),
                                 ),
                               ),
@@ -683,23 +801,33 @@ class _EquipmentMonitoringListViewState
                       const SizedBox(height: 14),
 
                       // 5. Observations
-                      const Text(
+                      Text(
                         "Observations / Objectifs (Optionnel)",
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: obsController,
                         maxLines: 2,
+                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: "Précisions sur cette session d'inspection...",
-                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
+                          hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400, fontSize: 12),
+                          filled: isDark,
+                          fillColor: isDark ? const Color(0xFF0F172A) : null,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
                         ),
                       ),
                       const SizedBox(height: 24),
@@ -757,6 +885,7 @@ class _EquipmentMonitoringListViewState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final list = filteredMonitorings;
 
     return Scaffold(
@@ -765,9 +894,9 @@ class _EquipmentMonitoringListViewState
         onPressed: _showPlanMonitoringSheet,
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add_rounded, color: Colors.white),
-        label: const Text(
-          "Planifier un suivi",
-          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
+        label: Text(
+          context.l10n.newEquipmentCheck,
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
         ),
       ),
       body: RefreshIndicator(
@@ -782,9 +911,11 @@ class _EquipmentMonitoringListViewState
               // ==================== BARRE DE RECHERCHE ====================
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : AppColors.border,
+                  ),
                   boxShadow: [
                     BoxShadow(
                       color: Colors.black.withValues(alpha: 0.02),
@@ -799,14 +930,14 @@ class _EquipmentMonitoringListViewState
                     setState(() => searchQuery = val);
                   },
                   decoration: InputDecoration(
-                    hintText: "Rechercher par station, inspecteur, réf...",
-                    hintStyle: const TextStyle(
-                      color: AppColors.textSecondary,
+                    hintText: context.l10n.searchEquipment,
+                    hintStyle: TextStyle(
+                      color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                       fontSize: 13,
                     ),
-                    prefixIcon: const Icon(
+                    prefixIcon: Icon(
                       Icons.search_rounded,
-                      color: AppColors.textSecondary,
+                      color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                       size: 20,
                     ),
                     suffixIcon: searchQuery.isNotEmpty
@@ -833,20 +964,22 @@ class _EquipmentMonitoringListViewState
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : AppColors.border.withValues(alpha: 0.8),
+                  ),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildStatColumn("$totalCount", "Total Suivis", AppColors.primary),
-                    Container(height: 28, width: 1, color: Colors.grey.shade200),
-                    _buildStatColumn("$inProgressCount", "En cours", const Color(0xFF1D4ED8)),
-                    Container(height: 28, width: 1, color: Colors.grey.shade200),
-                    _buildStatColumn("$plannedCount", "Planifiées", const Color(0xFFB45309)),
-                    Container(height: 28, width: 1, color: Colors.grey.shade200),
-                    _buildStatColumn("$completedCount", "Clôturées", const Color(0xFF15803D)),
+                    _buildStatColumn("$totalCount", "${context.l10n.all} ${context.l10n.trackings}", AppColors.primary),
+                    Container(height: 28, width: 1, color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
+                    _buildStatColumn("$inProgressCount", context.l10n.inProgress, const Color(0xFF1D4ED8)),
+                    Container(height: 28, width: 1, color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
+                    _buildStatColumn("$plannedCount", context.l10n.planned, const Color(0xFFB45309)),
+                    Container(height: 28, width: 1, color: isDark ? const Color(0xFF334155) : Colors.grey.shade200),
+                    _buildStatColumn("$completedCount", context.l10n.closed, const Color(0xFF15803D)),
                   ],
                 ),
               ),
@@ -860,34 +993,50 @@ class _EquipmentMonitoringListViewState
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFFBFDBFE),
-                          width: 1.0,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          onlyAssignedToMe = !onlyAssignedToMe;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: onlyAssignedToMe
+                              ? const Color(0xFF1D4ED8)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF)),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: onlyAssignedToMe
+                                ? const Color(0xFF1D4ED8)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                            width: 1.0,
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.person_pin,
-                            size: 15,
-                            color: Color(0xFF1D4ED8),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            "Mes assignations ($assignedToMeCount)",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1D4ED8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.person_pin,
+                              size: 15,
+                              color: onlyAssignedToMe
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 5),
+                            Text(
+                              "${context.l10n.assignedToMe} ($assignedToMeCount)",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: onlyAssignedToMe
+                                    ? Colors.white
+                                    : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -927,9 +1076,9 @@ class _EquipmentMonitoringListViewState
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -937,15 +1086,15 @@ class _EquipmentMonitoringListViewState
                       Icon(
                         Icons.assignment_outlined,
                         size: 48,
-                        color: Colors.grey.shade400,
+                        color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400,
                       ),
                       const SizedBox(height: 12),
-                      const Text(
+                      Text(
                         "Aucun suivi de matériel attribué",
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
@@ -954,9 +1103,9 @@ class _EquipmentMonitoringListViewState
                             ? "Essayez de modifier vos critères de recherche ou de filtre."
                             : "Aucun contrôle d'équipements n'est actuellement assigné à votre profil.",
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textSecondary,
+                          color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                         ),
                       ),
                       const SizedBox(height: 16),

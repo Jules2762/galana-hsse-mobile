@@ -50,6 +50,7 @@ class EquipmentMonitoringCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isAssignedToMe = ApiClient.isAssignedToCurrentUser(monitoring.inspector);
     final int total = monitoring.totalEquipments;
     final int conformes = monitoring.conformeCount;
@@ -62,9 +63,14 @@ class EquipmentMonitoringCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isAssignedToMe ? const Color(0xFF93C5FD) : AppColors.border.withValues(alpha: 0.8), width: isAssignedToMe ? 1.5 : 1.0),
+          border: Border.all(
+            color: isDark
+                ? (isAssignedToMe ? const Color(0xFF3B82F6) : const Color(0xFF334155))
+                : (isAssignedToMe ? const Color(0xFF93C5FD) : AppColors.border.withValues(alpha: 0.8)),
+            width: isAssignedToMe ? 1.5 : 1.0,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -83,15 +89,17 @@ class EquipmentMonitoringCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: isDark
+                        ? const Color(0xFF0F9D58).withValues(alpha: 0.2)
+                        : AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     monitoring.reference,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primaryDark,
+                      color: isDark ? const Color(0xFF4ADE80) : AppColors.primaryDark,
                     ),
                   ),
                 ),
@@ -121,21 +129,29 @@ class EquipmentMonitoringCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFF7ED),
+                      color: isDark
+                          ? const Color(0xFF78350F).withValues(alpha: 0.6)
+                          : const Color(0xFFFFF7ED),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFFDBA74)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFFB45309) : const Color(0xFFFDBA74),
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.cloud_upload_outlined, size: 12, color: Color(0xFFEA580C)),
-                        SizedBox(width: 3),
+                        Icon(
+                          Icons.cloud_upload_outlined,
+                          size: 12,
+                          color: isDark ? const Color(0xFFFDBA74) : const Color(0xFFEA580C),
+                        ),
+                        const SizedBox(width: 3),
                         Text(
                           "En attente",
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFEA580C),
+                            color: isDark ? const Color(0xFFFDBA74) : const Color(0xFFEA580C),
                           ),
                         ),
                       ],
@@ -158,10 +174,10 @@ class EquipmentMonitoringCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     monitoring.siteName,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: Color(0xFF1E293B),
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -175,7 +191,13 @@ class EquipmentMonitoringCard extends StatelessWidget {
             // ==================== INSPECTEUR & DATE ====================
             Row(
               children: [
-                Icon(isAssignedToMe ? Icons.person_pin : Icons.person_outline_rounded, size: 14, color: isAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
+                Icon(
+                  isAssignedToMe ? Icons.person_pin : Icons.person_outline_rounded,
+                  size: 14,
+                  color: isDark
+                      ? (isAssignedToMe ? const Color(0xFF60A5FA) : const Color(0xFF94A3B8))
+                      : (isAssignedToMe ? const Color(0xFF2563EB) : const Color(0xFF64748B)),
+                ),
                 const SizedBox(width: 4),
                 Flexible(
                   child: Text(
@@ -183,7 +205,9 @@ class EquipmentMonitoringCard extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: isAssignedToMe ? FontWeight.w600 : FontWeight.normal,
-                      color: isAssignedToMe ? const Color(0xFF1E40AF) : const Color(0xFF64748B),
+                      color: isDark
+                          ? (isAssignedToMe ? const Color(0xFF93C5FD) : const Color(0xFF94A3B8))
+                          : (isAssignedToMe ? const Color(0xFF1E40AF) : const Color(0xFF64748B)),
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -194,26 +218,37 @@ class EquipmentMonitoringCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: isDark
+                          ? const Color(0xFF1E3A8A).withValues(alpha: 0.6)
+                          : const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE),
+                      ),
                     ),
-                    child: const Text(
+                    child: Text(
                       "Attribuée",
                       style: TextStyle(
                         fontSize: 9.5,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF1D4ED8),
+                        color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
                       ),
                     ),
                   ),
                 ],
                 const SizedBox(width: 10),
-                const Icon(Icons.calendar_today_outlined, size: 13, color: Color(0xFF64748B)),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 13,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
                 const SizedBox(width: 4),
                 Text(
                   monitoring.date,
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                  ),
                 ),
               ],
             ),
@@ -234,7 +269,7 @@ class EquipmentMonitoringCard extends StatelessWidget {
             ],
 
             const SizedBox(height: 12),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
             const SizedBox(height: 10),
 
             // ==================== STATS & COMPTEURS ====================
@@ -244,15 +279,15 @@ class EquipmentMonitoringCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     "$total matériel${total > 1 ? 's' : ''}",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF475569),
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                     ),
                   ),
                 ),

@@ -15,7 +15,8 @@ class AttachmentCard extends StatelessWidget {
     this.onTap,
   });
 
-  Widget _preview() {
+  Widget _preview(bool isDark) {
+    final placeholderBg = isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9);
     switch (attachment.fileType.toLowerCase()) {
       case "image":
         return ClipRRect(
@@ -46,7 +47,7 @@ class AttachmentCard extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             Container(
-              color: const Color(0xFFF1F5F9),
+              color: placeholderBg,
             ),
 
             const Center(
@@ -62,7 +63,7 @@ class AttachmentCard extends StatelessWidget {
       case "pdf":
       case "document":
         return Container(
-          color: const Color(0xFFF8FAFC),
+          color: placeholderBg,
           child: const Center(
             child: Icon(
               Icons.picture_as_pdf,
@@ -74,7 +75,7 @@ class AttachmentCard extends StatelessWidget {
 
       default:
         return Container(
-          color: const Color(0xFFF8FAFC),
+          color: placeholderBg,
           child: const Center(
             child: Icon(
               Icons.insert_drive_file_outlined,
@@ -88,15 +89,16 @@ class AttachmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: const Color(0xFFE2E8F0),
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
           ),
         ),
         child: Column(
@@ -105,7 +107,7 @@ class AttachmentCard extends StatelessWidget {
               child: Stack(
                 children: [
                   Positioned.fill(
-                    child: _preview(),
+                    child: _preview(isDark),
                   ),
 
                   Positioned(
@@ -135,9 +137,10 @@ class AttachmentCard extends StatelessWidget {
                 attachment.fileName,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w500,
+                  color: isDark ? Colors.white : Colors.black87,
                 ),
               ),
             ),

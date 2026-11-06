@@ -1,8 +1,11 @@
+import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:gestion_hsse/cores/models/emergency_contact_model.dart';
+import 'package:gestion_hsse/cores/services/user_location_service.dart';
 
 class EmergencyMapView extends StatefulWidget {
   final List<EmergencyContactModel> contacts;
@@ -28,8 +31,15 @@ class EmergencyMapView extends StatefulWidget {
   State<EmergencyMapView> createState() => _EmergencyMapViewState();
 }
 
-class _EmergencyMapViewState extends State<EmergencyMapView> {
+class _EmergencyMapViewState extends State<EmergencyMapView> with SingleTickerProviderStateMixin {
   late final MapController _mapController;
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseAnimation;
+
+  Position? _userPosition;
+  StreamSubscription<Position>? _userLocationSubscription;
+  bool _isLocatingUser = false;
+  bool _isTrackingUser = false;
 
   EmergencyContactModel? _highlightedContact;
   EmergencySiteModel? _highlightedSite;
@@ -56,6 +66,19 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
     if (widget.selectedSite != null) {
       _highlightedSite = widget.selectedSite;
     }
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..repeat();
+
+    _pulseAnimation = CurvedAnimation(
+      parent: _pulseController,
+      curve: Curves.easeOut,
+    );
+
+    // Initialisation du suivi GPS en direct
+    _startLocationTracking(autoCenter: false);
   }
 
   @override
@@ -74,8 +97,94 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
 
   @override
   void dispose() {
+    _userLocationSubscription?.cancel();
+    _pulseController.dispose();
     _mapController.dispose();
     super.dispose();
+  }
+
+  // ==========================================
+  // SUIVI GPS EN TEMPS RÉEL (STYLE GOOGLE MAPS)
+  // ==========================================
+
+  Future<void> _startLocationTracking({bool autoCenter = false}) async {
+    if (mounted) setState(() => _isLocatingUser = true);
+
+    final hasPermission = await UserLocationService.requestPermission(context);
+    if (!hasPermission) {
+      if (mounted) setState(() => _isLocatingUser = false);
+      return;
+    }
+
+    // 1. Position initiale immédiate
+    try {
+      final initialPos = await UserLocationService.getCurrentPosition();
+      if (!mounted) return;
+      if (initialPos != null) {
+        setState(() {
+          _userPosition = initialPos;
+          _isLocatingUser = false;
+        });
+        if (autoCenter) {
+          _centerOnUser();
+        }
+      }
+    } catch (_) {
+      if (mounted) setState(() => _isLocatingUser = false);
+    }
+
+    // 2. Flux temps réel continu
+    _userLocationSubscription?.cancel();
+    _userLocationSubscription = UserLocationService.getPositionStream(
+      distanceFilterMeters: 3,
+      accuracy: LocationAccuracy.high,
+    ).listen(
+      (Position pos) {
+        if (!mounted) return;
+        setState(() {
+          _userPosition = pos;
+          _isLocatingUser = false;
+        });
+        if (_isTrackingUser) {
+          _mapController.move(LatLng(pos.latitude, pos.longitude), _mapController.camera.zoom);
+        }
+      },
+      onError: (_) {
+        if (mounted) setState(() => _isLocatingUser = false);
+      },
+    );
+  }
+
+  void _centerOnUser() {
+    if (_userPosition != null) {
+      setState(() => _isTrackingUser = true);
+      _mapController.move(
+        LatLng(_userPosition!.latitude, _userPosition!.longitude),
+        15.5,
+      );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.gps_fixed_rounded, color: Colors.white, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  "Centré sur votre position (Précision : ±${_userPosition!.accuracy.round()} m)",
+                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          duration: const Duration(seconds: 2),
+          backgroundColor: const Color(0xFF1A73E8),
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+        ),
+      );
+    } else {
+      _startLocationTracking(autoCenter: true);
+    }
   }
 
   // ==========================================
@@ -153,6 +262,104 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
 
   List<Marker> _buildMarkers(Map<dynamic, double> nearbyDistMap) {
     final List<Marker> markers = [];
+
+    // 0. Marqueur de localisation de l'utilisateur (Style Google Maps avec onde pulsante)
+    if (_userPosition != null) {
+      markers.add(
+        Marker(
+          point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
+          width: 56,
+          height: 56,
+          child: GestureDetector(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const Icon(Icons.my_location_rounded, color: Colors.white, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          "Votre position actuelle (Précision : ±${_userPosition!.accuracy.round()} m)",
+                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                  duration: const Duration(seconds: 2),
+                  backgroundColor: const Color(0xFF1A73E8),
+                  behavior: SnackBarBehavior.floating,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              );
+            },
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Onde radar pulsante Google Maps
+                AnimatedBuilder(
+                  animation: _pulseAnimation,
+                  builder: (context, child) {
+                    final scale = 1.0 + (_pulseAnimation.value * 0.9);
+                    final opacity = (1.0 - _pulseAnimation.value).clamp(0.0, 1.0);
+                    return Transform.scale(
+                      scale: scale,
+                      child: Container(
+                        width: 26,
+                        height: 26,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: const Color(0xFF1A73E8).withValues(alpha: opacity * 0.45),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                // Faisceau de visée / directionnel (si orientation valide)
+                if (_userPosition!.heading >= 0)
+                  Transform.rotate(
+                    angle: (_userPosition!.heading * math.pi) / 180,
+                    child: CustomPaint(
+                      size: const Size(44, 44),
+                      painter: _UserHeadingBeamPainter(),
+                    ),
+                  ),
+
+                // Point bleu Google Maps central avec contour blanc franc et éclat intérieur
+                Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1A73E8),
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white, width: 3.0),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF1A73E8).withValues(alpha: 0.5),
+                        blurRadius: 8,
+                        spreadRadius: 1,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Container(
+                      width: 5,
+                      height: 5,
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
 
     // 1. Marqueurs des Stations Galana
     for (final site in widget.sites) {
@@ -342,6 +549,11 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
             initialZoom: _defaultZoom,
             minZoom: 5.0,
             maxZoom: 18.0,
+            onPositionChanged: (camera, hasGesture) {
+              if (hasGesture && _isTrackingUser) {
+                setState(() => _isTrackingUser = false);
+              }
+            },
             onTap: (_, _) {
               if (_highlightedContact != null || _highlightedSite != null) {
                 setState(() {
@@ -354,8 +566,25 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
           children: [
             TileLayer(
               urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'mg.galana.gestion_hsse',
+              userAgentPackageName: 'com.example.mobile',
+              maxZoom: 19,
+              fallbackUrl: 'https://basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
             ),
+
+            // Halo de précision GPS utilisateur en temps réel (Style Google Maps)
+            if (_userPosition != null)
+              CircleLayer(
+                circles: [
+                  CircleMarker(
+                    point: LatLng(_userPosition!.latitude, _userPosition!.longitude),
+                    radius: math.max(15.0, _userPosition!.accuracy),
+                    useRadiusInMeter: true,
+                    color: const Color(0xFF1A73E8).withValues(alpha: 0.10),
+                    borderColor: const Color(0xFF1A73E8).withValues(alpha: 0.35),
+                    borderStrokeWidth: 1.0,
+                  ),
+                ],
+              ),
 
             // Cercle de périmètre d'intervention de la station sélectionnée
             if (_highlightedSite != null &&
@@ -444,35 +673,94 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
 
               const SizedBox(height: 8),
 
-              // Badge indicateur du nombre de repères affichés
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.95),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 4,
+              // Badges indicateurs : Total points & Statut GPS
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.95),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 4,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.pin_drop_rounded, size: 13, color: Color(0xFF0F9D58)),
-                    const SizedBox(width: 4),
-                    Text(
-                      "${markers.length} points (Stations Galana & Secours)",
-                      style: const TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF334155),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.pin_drop_rounded, size: 13, color: Color(0xFF0F9D58)),
+                        const SizedBox(width: 4),
+                        Text(
+                          "${markers.length} points",
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF334155),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  const SizedBox(width: 8),
+
+                  // Badge GPS utilisateur temps réel interactif
+                  GestureDetector(
+                    onTap: _centerOnUser,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _userPosition != null
+                            ? const Color(0xFFE8F0FE)
+                            : Colors.white.withValues(alpha: 0.95),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: _userPosition != null
+                              ? const Color(0xFF1A73E8).withValues(alpha: 0.4)
+                              : const Color(0xFFCBD5E1),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.04),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _userPosition != null
+                                  ? const Color(0xFF1A73E8)
+                                  : (_isLocatingUser ? const Color(0xFFF59E0B) : const Color(0xFF94A3B8)),
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            _isLocatingUser
+                                ? "Recherche GPS..."
+                                : (_userPosition != null ? "GPS Direct" : "Activer GPS"),
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              color: _userPosition != null
+                                  ? const Color(0xFF1A73E8)
+                                  : const Color(0xFF64748B),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ],
           ),
@@ -499,8 +787,28 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
                 onTap: _zoomOut,
               ),
               const SizedBox(height: 6),
+
+              // Bouton Ma position en temps réel (Style Google Maps)
               _buildFloatingBtn(
-                icon: Icons.my_location_rounded,
+                icon: _isLocatingUser
+                    ? Icons.gps_not_fixed_rounded
+                    : (_isTrackingUser
+                        ? Icons.gps_fixed_rounded
+                        : Icons.my_location_rounded),
+                tooltip: "Ma position en temps réel (GPS)",
+                onTap: _centerOnUser,
+                color: _isTrackingUser
+                    ? const Color(0xFF1A73E8)
+                    : (_userPosition != null ? const Color(0xFFE8F0FE) : Colors.white),
+                iconColor: _isTrackingUser
+                    ? Colors.white
+                    : const Color(0xFF1A73E8),
+              ),
+              const SizedBox(height: 6),
+
+              // Bouton recentrage sur la sélection ou Madagascar
+              _buildFloatingBtn(
+                icon: Icons.center_focus_strong_rounded,
                 tooltip: "Recentrer sur la sélection",
                 onTap: _recenterMap,
                 color: const Color(0xFF0F9D58),
@@ -551,6 +859,7 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
                     ),
                   ),
                   const SizedBox(height: 8),
+                  _buildLegendRow(const Color(0xFF1A73E8), "Votre position (GPS)", icon: Icons.my_location_rounded),
                   _buildLegendRow(const Color(0xFF0F9D58), "Station Galana", icon: Icons.local_gas_station_rounded),
                   _buildLegendRow(const Color(0xFFDC2626), "Pompiers (118)", emoji: "🚒"),
                   _buildLegendRow(const Color(0xFF0284C7), "SAMU / Ambulance (124)", emoji: "🚑"),
@@ -641,6 +950,26 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
                                 color: Color(0xFF64748B),
                               ),
                             ),
+                            if (_userPosition != null &&
+                                _highlightedContact!.latitude != null &&
+                                _highlightedContact!.longitude != null)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 3),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.navigation_rounded, size: 11, color: Color(0xFF1A73E8)),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      "À ${_formatDistance(_calculateDistanceKm(_userPosition!.latitude, _userPosition!.longitude, _highlightedContact!.latitude!, _highlightedContact!.longitude!))} de votre position",
+                                      style: const TextStyle(
+                                        fontSize: 10.5,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF1A73E8),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -835,6 +1164,25 @@ class _EmergencyMapViewState extends State<EmergencyMapView> {
                         color: Color(0xFF64748B),
                       ),
                     ),
+                    if (_userPosition != null && site.latitude != null && site.longitude != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 2),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.navigation_rounded, size: 10, color: Color(0xFF1A73E8)),
+                            const SizedBox(width: 3),
+                            Text(
+                              "À ${_formatDistance(_calculateDistanceKm(_userPosition!.latitude, _userPosition!.longitude, site.latitude!, site.longitude!))} de votre position",
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Color(0xFF1A73E8),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                   ],
                 ),
               ),
@@ -1225,6 +1573,37 @@ class _TrianglePainter extends CustomPainter {
       ..moveTo(0, 0)
       ..lineTo(size.width, 0)
       ..lineTo(size.width / 2, size.height)
+      ..close();
+
+    canvas.drawPath(path, paint);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+class _UserHeadingBeamPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = size.width / 2;
+
+    final paint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF1A73E8).withValues(alpha: 0.35),
+          const Color(0xFF1A73E8).withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromCircle(center: center, radius: radius));
+
+    final path = Path()
+      ..moveTo(center.dx, center.dy)
+      ..arcTo(
+        Rect.fromCircle(center: center, radius: radius),
+        -math.pi / 2 - 0.45,
+        0.9,
+        false,
+      )
       ..close();
 
     canvas.drawPath(path, paint);

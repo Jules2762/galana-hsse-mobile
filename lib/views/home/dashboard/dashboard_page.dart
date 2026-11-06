@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/checklist_service.dart';
 import 'package:gestion_hsse/cores/services/equipment_service.dart';
@@ -122,6 +123,7 @@ class _DashboardPageState extends State<DashboardPage> {
     return ListenableBuilder(
       listenable: SyncService.instance,
       builder: (context, _) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         final isOnline = SyncService.instance.isOnline;
         final pendingCount = SyncService.instance.pendingCount;
         final isSyncing = SyncService.instance.isSyncing;
@@ -179,7 +181,7 @@ class _DashboardPageState extends State<DashboardPage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  'Bonjour $userName 👋',
+                                  '${context.l10n.helloUser} $userName 👋',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
@@ -228,8 +230,8 @@ class _DashboardPageState extends State<DashboardPage> {
                             const SizedBox(width: 8),
                             Text(
                               isOnline
-                                  ? 'Connecté au serveur • Synchronisation temps réel'
-                                  : 'Mode Hors-ligne • $pendingCount inspection(s) en attente',
+                                  ? context.l10n.connectedServerRealtime
+                                  : context.l10n.offlinePendingInspections(pendingCount),
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 11,
@@ -252,25 +254,29 @@ class _DashboardPageState extends State<DashboardPage> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 14, vertical: 10),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFFFBEB),
+                      color: isDark
+                          ? const Color(0xFF78350F).withValues(alpha: 0.5)
+                          : const Color(0xFFFFFBEB),
                       borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0xFFFDE68A)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A),
+                      ),
                     ),
                     child: Row(
                       children: [
-                        const Icon(
+                        Icon(
                           Icons.cloud_upload_outlined,
-                          color: Color(0xFFD97706),
+                          color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFD97706),
                           size: 22,
                         ),
                         const SizedBox(width: 10),
                         Expanded(
                           child: Text(
-                            '$pendingCount inspection(s) effectuée(s) hors-ligne. Envoi automatique dès reconnexion.',
-                            style: const TextStyle(
+                            context.l10n.offlinePendingBanner(pendingCount),
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF92400E),
+                              color: isDark ? const Color(0xFFFDE68A) : const Color(0xFF92400E),
                             ),
                           ),
                         ),
@@ -280,11 +286,11 @@ class _DashboardPageState extends State<DashboardPage> {
                                 ? null
                                 : () => SyncService.instance.syncAll(),
                             child: Text(
-                              isSyncing ? 'En cours...' : 'Envoyer',
-                              style: const TextStyle(
+                              isSyncing ? '${context.l10n.inProgress}...' : context.l10n.sendNow,
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFFD97706),
+                                color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFD97706),
                               ),
                             ),
                           ),
@@ -298,12 +304,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 // ==========================================
                 // 3. PILIERS D'INSPECTION TERRAIN (ACCÈS DIRECT)
                 // ==========================================
-                const Text(
-                  "Piliers d'Inspection Galana",
+                Text(
+                  context.l10n.galanaPillars,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
                 const SizedBox(height: 10),
@@ -314,10 +320,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     Expanded(
                       child: _buildInspectionModuleCard(
                         title: "VMC",
-                        subtitle: "${_vmcs.length} visites",
+                        subtitle: "${_vmcs.length} ${context.l10n.visits}",
                         icon: Icons.assignment_turned_in,
                         color: const Color(0xFF0F9D58),
                         badge: "CC • SS • Mag",
+                        isDark: isDark,
                         onTap: () {
                           if (widget.onNavigateTab != null) {
                             widget.onNavigateTab!(1, 0);
@@ -333,10 +340,11 @@ class _DashboardPageState extends State<DashboardPage> {
                     Expanded(
                       child: _buildInspectionModuleCard(
                         title: "Checklists",
-                        subtitle: "${_checklists.length} fiches",
+                        subtitle: "${_checklists.length} ${context.l10n.sheets}",
                         icon: Icons.checklist_rtl_rounded,
                         color: const Color(0xFF2563EB),
                         badge: "Terrain",
+                        isDark: isDark,
                         onTap: () {
                           if (widget.onNavigateTab != null) {
                             widget.onNavigateTab!(1, 1);
@@ -351,11 +359,12 @@ class _DashboardPageState extends State<DashboardPage> {
                     // Pilier 3 : Matériel
                     Expanded(
                       child: _buildInspectionModuleCard(
-                        title: "Matériel",
-                        subtitle: "${_equipments.length} suivis",
+                        title: context.l10n.equipment,
+                        subtitle: "${_equipments.length} ${context.l10n.trackings}",
                         icon: Icons.fire_extinguisher,
                         color: const Color(0xFFEA580C),
                         badge: "Extincteurs • RIA",
+                        isDark: isDark,
                         onTap: () {
                           if (widget.onNavigateTab != null) {
                             widget.onNavigateTab!(1, 2);
@@ -378,7 +387,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     QuickAction(
                       icon: Icons.fact_check_outlined,
-                      label: 'Inspections',
+                      label: context.l10n.inspections,
                       onTap: () {
                         if (widget.onNavigateTab != null) {
                           widget.onNavigateTab!(1, 0);
@@ -389,7 +398,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     QuickAction(
                       icon: Icons.description_outlined,
-                      label: 'Rapports',
+                      label: context.l10n.reports,
                       onTap: () {
                         if (widget.onNavigateTab != null) {
                           widget.onNavigateTab!(2);
@@ -398,14 +407,14 @@ class _DashboardPageState extends State<DashboardPage> {
                     ),
                     QuickAction(
                       icon: Icons.settings_outlined,
-                      label: 'Paramètres',
+                      label: context.l10n.settings,
                       onTap: () {
                         Navigator.pushNamed(context, AppRoutes.settings);
                       },
                     ),
                     QuickAction(
                       icon: Icons.notifications_outlined,
-                      label: "Alertes",
+                      label: context.l10n.alerts,
                       showBadge: _deviationsCount > 0,
                       badgeValue: _deviationsCount.toString(),
                       onTap: () {
@@ -461,19 +470,19 @@ class _DashboardPageState extends State<DashboardPage> {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
-                                "Carte des Inspections",
-                                style: TextStyle(
+                                context.l10n.inspectionsMap,
+                                style: const TextStyle(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                   color: Colors.white,
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
-                                "Voir VMC, Checklists & Matériel sur la carte",
-                                style: TextStyle(
+                                context.l10n.inspectionsMapSubtitle,
+                                style: const TextStyle(
                                   fontSize: 11,
                                   color: Color(0xFF94A3B8),
                                 ),
@@ -500,13 +509,17 @@ class _DashboardPageState extends State<DashboardPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFFFEF2F2), Color(0xFFFEE2E2)],
+                      gradient: LinearGradient(
+                        colors: isDark
+                            ? const [Color(0xFF450A0A), Color(0xFF7F1D1D)]
+                            : const [Color(0xFFFEF2F2), Color(0xFFFEE2E2)],
                         begin: Alignment.topLeft,
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: const Color(0xFFFECACA)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFECACA),
+                      ),
                     ),
                     child: Row(
                       children: [
@@ -533,33 +546,33 @@ class _DashboardPageState extends State<DashboardPage> {
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
+                            children: [
                               Text(
-                                "Contacts d'Urgence & Secours",
+                                context.l10n.emergencyBannerTitle,
                                 style: TextStyle(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF991B1B),
+                                  color: isDark ? const Color(0xFFFECACA) : const Color(0xFF991B1B),
                                 ),
                               ),
-                              SizedBox(height: 2),
+                              const SizedBox(height: 2),
                               Text(
-                                "Pompiers 118 • SAMU 124 • Police 117 • Gendarmerie 119",
+                                context.l10n.emergencyBannerSubtitle,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w500,
-                                  color: Color(0xFFB91C1C),
+                                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const Icon(
+                        Icon(
                           Icons.arrow_forward_ios_rounded,
                           size: 14,
-                          color: Color(0xFFDC2626),
+                          color: isDark ? const Color(0xFFF87171) : const Color(0xFFDC2626),
                         ),
                       ],
                     ),
@@ -574,12 +587,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       "Indicateurs Clés HSSE",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     if (_isLoading)
@@ -656,12 +669,12 @@ class _DashboardPageState extends State<DashboardPage> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       "Dernières Inspections",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     TextButton(
@@ -742,9 +755,10 @@ class _DashboardPageState extends State<DashboardPage> {
     required Color color,
     required String badge,
     required VoidCallback onTap,
+    bool isDark = false,
   }) {
     return Material(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       borderRadius: BorderRadius.circular(16),
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
@@ -753,7 +767,9 @@ class _DashboardPageState extends State<DashboardPage> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: color.withValues(alpha: 0.2)),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : color.withValues(alpha: 0.2),
+            ),
             boxShadow: [
               BoxShadow(
                 color: color.withValues(alpha: 0.06),
@@ -777,10 +793,10 @@ class _DashboardPageState extends State<DashboardPage> {
               const SizedBox(height: 10),
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 2),
@@ -788,7 +804,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 subtitle,
                 style: TextStyle(
                   fontSize: 11,
-                  color: Colors.grey.shade600,
+                  color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
                   fontWeight: FontWeight.w500,
                 ),
               ),

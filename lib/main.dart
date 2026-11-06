@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/services/app_settings_service.dart';
+import 'package:gestion_hsse/cores/services/onesignal_service.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_theme.dart';
+import 'package:gestion_hsse/l10n/app_localizations.dart';
 import 'cores/routes/app_routes.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  OneSignalService.navigatorKey = MainApp.navigatorKey;
+  await OneSignalService.instance.init();
   await ApiClient.init();
   await SyncService.instance.init();
+  await AppSettingsService.instance.init();
 
   // Écoute des déconnexions forcées (compte désactivé ou session expirée)
   ApiClient.onSessionExpired = (bool isAccountDisabled) {
@@ -56,14 +62,22 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: navigatorKey,
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
-      initialRoute: AppRoutes.login,
-      routes: AppRoutes.routes,
+    return ListenableBuilder(
+      listenable: AppSettingsService.instance,
+      builder: (context, _) {
+        return MaterialApp(
+          navigatorKey: navigatorKey,
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: AppSettingsService.instance.themeMode,
+          locale: AppSettingsService.instance.currentLocale,
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          initialRoute: AppRoutes.login,
+          routes: AppRoutes.routes,
+        );
+      },
     );
   }
 }

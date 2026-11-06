@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/services/notification_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/notification/widget/notification_card.dart';
@@ -80,9 +81,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
         _allNotifications = _allNotifications.map((n) => n.copyWith(viewed: true)).toList();
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Toutes les notifications sont marquées comme lues."),
-          backgroundColor: Color(0xFF15803D),
+        SnackBar(
+          content: Text(context.l10n.allNotificationsRead),
+          backgroundColor: const Color(0xFF15803D),
         ),
       );
     }
@@ -131,7 +132,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 const Spacer(),
                 TextButton(
                   onPressed: _allNotifications.any((n) => !n.viewed) ? _markAllAsRead : null,
-                  child: const Text("Tout marquer lu"),
+                  child: Text(context.l10n.markAllAsRead),
                 ),
               ],
             ),
@@ -179,9 +180,9 @@ class _NotificationsPageState extends State<NotificationsPage> {
                     children: [
                       Icon(Icons.notifications_none, size: 48, color: Colors.grey.shade400),
                       const SizedBox(height: 12),
-                      const Text(
-                        "Aucune notification pour le moment",
-                        style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary),
+                      Text(
+                        context.l10n.noNotifications,
+                        style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.textSecondary),
                       ),
                     ],
                   ),

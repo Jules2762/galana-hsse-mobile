@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/services/camera_service.dart';
 import 'package:gestion_hsse/cores/services/personnel_service.dart';
 import 'package:gestion_hsse/cores/models/inspection_map_item.dart';
@@ -78,23 +79,24 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // Safety Awareness specific state
   String safetyAwarenessCommitment =
       "100% port des gants néoprène et lunettes lors des manipulations d'hydrocarbures et solvants.";
+  String? accompanyingPerson;
 
   @override
   void initState() {
     super.initState();
     vmc = widget.vmc ??
         const VmcItemData(
-          reference: "#VMC-SS-2026-012",
-          title: "Visite VMC Station-Service Antsirabe Centre",
+          reference: "",
+          title: "Visite VMC",
           type: "Station-Service",
-          code: "HSSE GALANA 1",
-          site: "Station Antsirabe Centre",
-          inspector: "Jean Rakoto (Directeur Réseau)",
-          date: "14 Oct 2026",
+          code: "",
+          site: "Site non spécifié",
+          inspector: "Inspecteur HSSE",
+          date: "",
           status: "En cours",
-          positivePoints: 11,
-          deviations: 2,
-          complianceRate: 0.85,
+          positivePoints: 0,
+          deviations: 0,
+          complianceRate: 1.0,
         );
     _initItemsForVmc();
     _initParticipants();
@@ -107,61 +109,17 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       final bool? isYes = copy['yes'];
       copy['answer'] ??= (isYes == true ? 'OUI' : (isYes == false ? 'NON' : 'N/A'));
       copy['photos'] ??= <String>[];
-      if (copy['answer'] == 'NON' && copy['action'] == null) {
-        copy['action'] = {
-          'description': "Action corrective pour l'écart constaté sur : ${copy['title']}",
-          'department': "Maintenance",
-          'assignee': "Marie Razafi (Superviseur)",
-          'priority': "Haute",
-        };
-      }
       return copy;
     }).toList();
     _initAwarenessSessions();
   }
 
   void _initAwarenessSessions() {
-    awarenessSessions = [
-      {
-        "date": "12/10/2026",
-        "type": "formation",
-        "volet": "Santé",
-        "intitule": "Port des EPI spécifiques & manipulation des produits chimiques",
-        "intervenant": "Mireille R. (Superviseur HSSE)",
-      },
-      {
-        "date": "12/10/2026",
-        "type": "sensibilisation",
-        "volet": "Sécurité",
-        "intitule": "Gestes et postures lors de la manutention des fûts de lubrifiants",
-        "intervenant": "Jean Rakoto (Chef de Piste)",
-      },
-      {
-        "date": "13/10/2026",
-        "type": "atelier",
-        "volet": "Environnement",
-        "intitule": "Déploiement du kit anti-pollution et gestion des terres souillées",
-        "intervenant": "Haja Tsiresy (Opérateur)",
-      },
-      {
-        "date": "14/10/2026",
-        "type": "induction",
-        "volet": "Sûreté",
-        "intitule": "Consignes de sécurité visiteur et règles de circulation des engins",
-        "intervenant": "Alain Bao (Maintenance)",
-      },
-    ];
+    awarenessSessions = [];
   }
 
   void _initParticipants() {
-    participants = [
-      {"name": "Jean Rakoto", "role": "Chef de Piste / Quart", "present": true},
-      {"name": "Marc Kely", "role": "Chauffeur Transporteur", "present": true},
-      {"name": "Haja Tsiresy", "role": "Opérateur Dépotage", "present": true},
-      {"name": "Mireille R.", "role": "Superviseur HSSE", "present": true},
-      {"name": "Alain B.", "role": "Technicien Maintenance", "present": true},
-      {"name": "Tahina Andriamihaja", "role": "Opérateur Dépotage", "present": true},
-    ];
+    participants = [];
   }
 
   @override
@@ -178,6 +136,16 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         if (vmc.id != null) {
           _fetchRemoteDetails(vmc.id!);
         }
+      } else if (args is Map) {
+        final vmcItem = VmcItemData.fromJson(Map<String, dynamic>.from(args));
+        setState(() {
+          vmc = vmcItem;
+          _initItemsForVmc();
+        });
+        _hasLoadedFromArgs = true;
+        if (vmc.id != null) {
+          _fetchRemoteDetails(vmc.id!);
+        }
       }
     }
   }
@@ -188,6 +156,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
     if (!mounted || detail == null) return;
 
     setState(() {
+      if (detail['accompanying_person'] != null) {
+        accompanyingPerson = detail['accompanying_person'].toString();
+      }
+
       // 1. Mise à jour de l'inspection si présente
       if (detail['inspection'] is Map &&
           detail['inspection']['items'] is List) {
@@ -207,13 +179,20 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             final dynamic rawNum = it['order'] ?? it['num'] ?? (autoIndex++);
             Map<String, dynamic>? action;
             if (it['action'] is Map) {
-              action = Map<String, dynamic>.from(it['action']);
-            } else if (ans == 'NON') {
+              final actMap = Map<String, dynamic>.from(it['action']);
+              final userObj = actMap['assignedUser'] ?? actMap['user'] ?? actMap['person_in_charge'];
+              String assigneeStr = '';
+              if (userObj is Map) {
+                assigneeStr = "${userObj['first_name'] ?? ''} ${userObj['last_name'] ?? ''}".trim();
+                if (assigneeStr.isEmpty) assigneeStr = userObj['name']?.toString() ?? '';
+              } else if (actMap['assignee'] != null) {
+                assigneeStr = actMap['assignee'].toString();
+              }
               action = {
-                'description': "Action corrective pour l'écart sur : ${it['title'] ?? ''}",
-                'department': 'Maintenance',
-                'assignee': 'Marie Razafi (Superviseur)',
-                'priority': 'Haute',
+                'description': actMap['description']?.toString() ?? '',
+                'department': actMap['department']?.toString() ?? 'Maintenance',
+                'assignee': assigneeStr.isNotEmpty ? assigneeStr : 'Non assigné',
+                'priority': actMap['priority']?.toString() ?? 'Haute',
               };
             }
             List<String> photos = [];
@@ -414,6 +393,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
@@ -421,9 +401,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 maxHeight: MediaQuery.of(context).size.height * 0.90,
               ),
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
                 child: Column(
@@ -433,7 +413,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -444,7 +424,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
+                            color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(Icons.rule_folder,
@@ -457,17 +437,17 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                             children: [
                               Text(
                                 "Évaluation ${vmc.code}",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: AppColors.textPrimary,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
                                 ),
                               ),
                               Text(
                                 "${vmc.reference} • ${vmcItems.length} points de contrôle officiels",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -530,10 +510,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                       children: [
                                         Text(
                                           item["title"].toString(),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontSize: 13,
                                             fontWeight: FontWeight.w600,
-                                            color: AppColors.textPrimary,
+                                            color: isDark ? Colors.white : AppColors.textPrimary,
                                           ),
                                         ),
                                         if (item["obs"] != null &&
@@ -543,10 +523,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                                 const EdgeInsets.only(top: 4),
                                             child: Text(
                                               "Obs: ${item['obs']}",
-                                              style: const TextStyle(
+                                              style: TextStyle(
                                                 fontSize: 11,
                                                 fontStyle: FontStyle.italic,
-                                                color: AppColors.textSecondary,
+                                                color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                               ),
                                             ),
                                           ),
@@ -562,11 +542,11 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                   ChoiceChip(
                                     label: const Text("Conforme"),
                                     selected: isYes,
-                                    selectedColor: const Color(0xFFDCFCE7),
+                                    selectedColor: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.5) : const Color(0xFFDCFCE7),
                                     labelStyle: TextStyle(
                                       color: isYes
-                                          ? const Color(0xFF15803D)
-                                          : AppColors.textSecondary,
+                                          ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D))
+                                          : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                       fontWeight: isYes
                                           ? FontWeight.bold
                                           : FontWeight.normal,
@@ -585,11 +565,11 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                   ChoiceChip(
                                     label: const Text("Écart"),
                                     selected: isNo,
-                                    selectedColor: const Color(0xFFFEE2E2),
+                                    selectedColor: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.5) : const Color(0xFFFEE2E2),
                                     labelStyle: TextStyle(
                                       color: isNo
-                                          ? const Color(0xFFB91C1C)
-                                          : AppColors.textSecondary,
+                                          ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C))
+                                          : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                       fontWeight: isNo
                                           ? FontWeight.bold
                                           : FontWeight.normal,
@@ -610,11 +590,11 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                   ChoiceChip(
                                     label: const Text("N/A"),
                                     selected: isNa,
-                                    selectedColor: const Color(0xFFF1F5F9),
+                                    selectedColor: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                                     labelStyle: TextStyle(
                                       color: isNa
-                                          ? const Color(0xFF475569)
-                                          : AppColors.textSecondary,
+                                          ? (isDark ? Colors.white : const Color(0xFF475569))
+                                          : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                       fontWeight: isNa
                                           ? FontWeight.bold
                                           : FontWeight.normal,
@@ -792,12 +772,32 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                               rawData: vmc.rawData,
                             );
                           });
+
+                          if (vmc.id != null) {
+                            final itemsPayload = vmcItems.map((it) {
+                              return {
+                                'id': it['id'],
+                                'answer': it['answer'] ??
+                                    (it['yes'] == true
+                                        ? 'OUI'
+                                        : (it['yes'] == false ? 'NON' : 'N/A')),
+                                'obs': it['obs'] ?? '',
+                                'observation': it['obs'] ?? '',
+                              };
+                            }).toList();
+                            VmcService.updateVmc(vmc.id!, {
+                              'items': itemsPayload,
+                              if (accompanyingPerson != null)
+                                'accompanying_person': accompanyingPerson,
+                            });
+                          }
+
                           Navigator.pop(context);
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               backgroundColor: AppColors.primary,
                               content: Text(
-                                "Évaluation mise à jour : $positive conforme(s), $dev écart(s) - Taux: ${(rate * 100).toInt()}%",
+                                "Évaluation enregistrée : $positive conforme(s), $dev écart(s) - Taux: ${(rate * 100).toInt()}%",
                               ),
                             ),
                           );
@@ -861,12 +861,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           "Corriger l'écart constaté sur : ${item['title'] ?? ''}",
     );
     String assignee =
-        existing?['assignee']?.toString() ?? "ARIMANANA Maherison Jules (Inspecteur HSSE)";
+        existing?['assignee']?.toString() ?? (ApiClient.currentUser?['name']?.toString() ?? "Inspecteur HSSE");
+    dynamic personId = existing?['person_id'] ?? existing?['person_in_charge_id'];
 
     final res = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (ctx, setDialogState) {
             return AlertDialog(
@@ -878,7 +880,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEE2E2),
+                      color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.warning_amber_rounded,
@@ -891,19 +893,19 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                       children: [
                         Text(
                           "Action Corrective • Pt ${item['num'] ?? ''}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
                           ),
                         ),
                         Text(
                           item['title']?.toString() ?? '',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
-                            color: AppColors.textSecondary,
+                            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                           ),
                         ),
                       ],
@@ -928,10 +930,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                       decoration: InputDecoration(
                         hintText: "Préciser l'action à mener...",
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : AppColors.border),
                         ),
                       ),
                     ),
@@ -951,6 +953,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         if (picked != null) {
                           setDialogState(() {
                             assignee = "${picked.fullName} (${picked.fonction})";
+                            personId = picked.id;
                           });
                         }
                       },
@@ -959,16 +962,16 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 12, vertical: 11),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
+                          color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
                         ),
                         child: Row(
                           children: [
                             Container(
                               padding: const EdgeInsets.all(6),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEFF6FF),
+                                color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.4) : const Color(0xFFEFF6FF),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Icon(Icons.person,
@@ -986,8 +989,8 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                       ? FontWeight.w600
                                       : FontWeight.normal,
                                   color: assignee.isNotEmpty
-                                      ? AppColors.textPrimary
-                                      : AppColors.textSecondary,
+                                      ? (isDark ? Colors.white : AppColors.textPrimary)
+                                      : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
@@ -1033,6 +1036,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       final actionMap = {
         'description': descCtrl.text.trim(),
         'assignee': assignee,
+        'person_id': personId,
         'createdAt': DateTime.now().toIso8601String(),
       };
 
@@ -1053,7 +1057,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           payload: {
             'vmc_inspection_item_id': item['id'],
             'description': descCtrl.text.trim(),
-            'person_in_charge': assignee,
+            'person_in_charge': personId ?? assignee,
             'status': 'PENDING',
           },
           createdAt: DateTime.now(),
@@ -1210,6 +1214,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
     final action = item['action'] as Map<String, dynamic>?;
     if (action == null) return const SizedBox.shrink();
 
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final desc = action['description']?.toString() ?? '';
     final assignee = action['assignee']?.toString() ?? 'Non assigné';
 
@@ -1217,9 +1222,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       margin: const EdgeInsets.only(left: 34, top: 8),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF7ED),
+        color: isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.25) : const Color(0xFFFFF7ED),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFED7AA)),
+        border: Border.all(color: isDark ? const Color(0xFFEA580C).withValues(alpha: 0.4) : const Color(0xFFFED7AA)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1229,13 +1234,13 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               const Icon(Icons.assignment_turned_in,
                   size: 16, color: Color(0xFFEA580C)),
               const SizedBox(width: 6),
-              const Expanded(
+              Expanded(
                 child: Text(
                   "Action Corrective Définie",
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF9A3412),
+                    color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF9A3412),
                   ),
                 ),
               ),
@@ -1243,8 +1248,8 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 IconButton(
                   padding: EdgeInsets.zero,
                   constraints: const BoxConstraints(),
-                  icon: const Icon(Icons.edit,
-                      size: 15, color: Color(0xFF9A3412)),
+                  icon: Icon(Icons.edit,
+                      size: 15, color: isDark ? const Color(0xFFFDBA74) : const Color(0xFF9A3412)),
                   tooltip: "Modifier l'action",
                   onPressed: () =>
                       _showCorrectiveActionDialogForItem(item, setModalState),
@@ -1269,30 +1274,30 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           const SizedBox(height: 6),
           Text(
             desc,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: isDark ? Colors.white : AppColors.textPrimary,
             ),
           ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.4) : const Color(0xFFEFF6FF),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.person, size: 13, color: Color(0xFF1D4ED8)),
+                Icon(Icons.person, size: 13, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
                 const SizedBox(width: 4),
                 Text(
                   assignee,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF1D4ED8),
+                    color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
                   ),
                 ),
               ],
@@ -1312,6 +1317,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         String query = "";
         return StatefulBuilder(
           builder: (context, setSheetState) {
@@ -1320,9 +1326,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 maxHeight: MediaQuery.of(context).size.height * 0.85,
               ),
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
                 child: Column(
@@ -1333,7 +1339,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -1344,14 +1350,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
+                            color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(Icons.person_add_alt_1,
                               color: AppColors.primary, size: 22),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1360,14 +1366,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: AppColors.textPrimary,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
                                 ),
                               ),
                               Text(
                                 "Sélectionnez parmi la liste des personnels Galana",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -1387,14 +1393,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         contentPadding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 10),
                         filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
+                        fillColor: isDark ? const Color(0xFF334155) : const Color(0xFFF8FAFC),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF475569) : AppColors.border),
                         ),
                         enabledBorder: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(color: AppColors.border),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF475569) : AppColors.border),
                         ),
                       ),
                       onChanged: (val) {
@@ -1425,12 +1431,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                           }).toList();
 
                           if (filtered.isEmpty) {
-                            return const Center(
+                            return Center(
                               child: Text(
                                 "Aucun personnel trouvé.",
                                 style: TextStyle(
                                     fontSize: 13,
-                                    color: AppColors.textSecondary),
+                                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                               ),
                             );
                           }
@@ -1450,29 +1456,29 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                 contentPadding: EdgeInsets.zero,
                                 leading: CircleAvatar(
                                   backgroundColor: alreadyAdded
-                                      ? const Color(0xFFDCFCE7)
-                                      : AppColors.primaryLight,
+                                      ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFDCFCE7))
+                                      : (isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight),
                                   child: Icon(
                                     alreadyAdded ? Icons.check : Icons.person,
                                     color: alreadyAdded
-                                        ? const Color(0xFF15803D)
+                                        ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D))
                                         : AppColors.primary,
                                     size: 18,
                                   ),
                                 ),
                                 title: Text(
                                   person.fullName,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                                 subtitle: Text(
                                   person.fonction,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.textSecondary,
+                                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                   ),
                                 ),
                                 trailing: alreadyAdded
@@ -1578,6 +1584,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (context, setModalState) {
             final feedbackController =
@@ -1588,9 +1595,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 maxHeight: MediaQuery.of(context).size.height * 0.88,
               ),
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
                 child: Column(
@@ -1601,7 +1608,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -1623,19 +1630,19 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text(
+                              Text(
                                 "Émargement Quart d'Heure Sécurité",
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: AppColors.textPrimary,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
                                 ),
                               ),
                               Text(
                                 "${participants.length} participant(s) présent(s) • 15 min chrono",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -1652,13 +1659,13 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        const Expanded(
+                        Expanded(
                           child: Text(
                             "Participants Présents à la Séance :",
                             style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -1686,13 +1693,13 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 8),
                     Expanded(
                       child: participants.isEmpty
-                          ? const Center(
+                          ? Center(
                               child: Text(
                                 "Aucun participant pour le moment.\nCliquez sur Ajouter pour sélectionner parmi le personnel.",
                                 textAlign: TextAlign.center,
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                 ),
                               ),
                             )
@@ -1721,17 +1728,17 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                         children: [
                                           Text(
                                             p["name"].toString(),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 13,
                                               fontWeight: FontWeight.bold,
-                                              color: AppColors.textPrimary,
+                                              color: isDark ? Colors.white : AppColors.textPrimary,
                                             ),
                                           ),
                                           Text(
                                             p["role"].toString(),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 11,
-                                              color: AppColors.textSecondary,
+                                              color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                             ),
                                           ),
                                         ],
@@ -1797,12 +1804,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                             ),
                     ),
                     const SizedBox(height: 10),
-                    const Text(
+                    Text(
                       "Questions / Remontées de l'équipe :",
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1898,6 +1905,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
@@ -1910,9 +1918,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 right: 20,
                 bottom: MediaQuery.of(context).viewInsets.bottom + 20,
               ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SingleChildScrollView(
                 child: Column(
@@ -1924,7 +1932,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -1942,7 +1950,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                               color: Color(0xFF007A78), size: 22),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -1951,14 +1959,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: AppColors.textPrimary,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
                                 ),
                               ),
                               Text(
                                 "Registre Officiel SAFETY TRAINING / AWARENESS",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -1975,12 +1983,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 16),
 
                     // Date
-                    const Text(
+                    Text(
                       "Date :",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -1995,12 +2003,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 14),
 
                     // Type (*)
-                    const Text(
+                    Text(
                       "Type (*) :",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -2014,7 +2022,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                           onSelected: (val) => setModalState(() => selectedType = type),
                           selectedColor: const Color(0xFF007A78),
                           labelStyle: TextStyle(
-                            color: isSel ? Colors.white : AppColors.textPrimary,
+                            color: isSel ? Colors.white : (isDark ? const Color(0xFF94A3B8) : AppColors.textPrimary),
                             fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                             fontSize: 12,
                           ),
@@ -2024,12 +2032,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 14),
 
                     // Volet (**)
-                    const Text(
+                    Text(
                       "Volet (**) :",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -2043,7 +2051,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                           onSelected: (val) => setModalState(() => selectedVolet = volet),
                           selectedColor: const Color(0xFF007A78),
                           labelStyle: TextStyle(
-                            color: isSel ? Colors.white : AppColors.textPrimary,
+                            color: isSel ? Colors.white : (isDark ? const Color(0xFF94A3B8) : AppColors.textPrimary),
                             fontWeight: isSel ? FontWeight.bold : FontWeight.normal,
                             fontSize: 12,
                           ),
@@ -2053,12 +2061,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 14),
 
                     // Intitulé
-                    const Text(
+                    Text(
                       "Intitulé de la formation / causerie :",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -2073,12 +2081,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 14),
 
                     // Intervenant
-                    const Text(
+                    Text(
                       "Intervenant :",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -2153,6 +2161,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return StatefulBuilder(
           builder: (context, setModalState) {
             return Container(
@@ -2160,9 +2169,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 maxHeight: MediaQuery.of(context).size.height * 0.90,
               ),
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
                 child: Column(
@@ -2173,7 +2182,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -2184,14 +2193,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         Container(
                           padding: const EdgeInsets.all(10),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFFEE2E2),
+                            color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2),
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: const Icon(Icons.report_problem,
                               color: Color(0xFFDC2626), size: 22),
                         ),
                         const SizedBox(width: 12),
-                        const Expanded(
+                        Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -2200,14 +2209,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
-                                  color: AppColors.textPrimary,
+                                  color: isDark ? Colors.white : AppColors.textPrimary,
                                 ),
                               ),
                               Text(
                                 "Niveau de gravité (0 à 5) & Mesures",
                                 style: TextStyle(
                                   fontSize: 12,
-                                  color: AppColors.textSecondary,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -2225,12 +2234,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        const Text(
+                        Text(
                           "Niveau de Gravité (Échelle 0 à 5) :",
                           style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
                           ),
                         ),
                         Container(
@@ -2324,18 +2333,18 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 16),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text(
+                      title: Text(
                         "Zone Immédiatement Sécurisée & Balisée",
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
-                      subtitle: const Text(
+                      subtitle: Text(
                         "Arrêt du flux et mise en sécurité des intervenants",
                         style: TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary),
+                            fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                       ),
                       value: isSecured,
                       activeThumbColor: AppColors.primary,
@@ -2346,12 +2355,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       "Mesures Conservatoires Prises :",
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -2417,26 +2426,32 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // 5. CLÔTURE OFFICIELLE DE LA VMC SUR LE TERRAIN
   // =========================================================================
   void _showClosureDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           title: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(Icons.verified, color: AppColors.primary, size: 22),
               ),
               const SizedBox(width: 10),
-              const Expanded(
+              Expanded(
                 child: Text(
                   "Clôturer la VMC",
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
                 ),
               ),
             ],
@@ -2447,15 +2462,18 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             children: [
               Text(
                 "Vous êtes sur le point de clôturer officiellement cette VMC sur le terrain :",
-                style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2471,24 +2489,30 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 4),
                     Text(
                       vmc.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
                     Text(
                       "Évaluateur : ${vmc.inspector}\nSite : ${vmc.site}",
-                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                      ),
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 "Une fois clôturée, la fiche officielle Galana sera générée et disponible au format PDF certifié.",
-                style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
               ),
             ],
           ),
@@ -2510,6 +2534,23 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 final messenger = ScaffoldMessenger.of(context);
                 if (vmc.id != null) {
                   await VmcService.updateStatus(vmc.id!, 'COMPLETED');
+                  final itemsPayload = vmcItems.map((it) {
+                    return {
+                      'id': it['id'],
+                      'answer': it['answer'] ??
+                          (it['yes'] == true
+                              ? 'OUI'
+                              : (it['yes'] == false ? 'NON' : 'N/A')),
+                      'obs': it['obs'] ?? '',
+                      'observation': it['obs'] ?? '',
+                    };
+                  }).toList();
+                  await VmcService.updateVmc(vmc.id!, {
+                    'status': 'COMPLETED',
+                    'items': itemsPayload,
+                    if (accompanyingPerson != null)
+                      'accompanying_person': accompanyingPerson,
+                  });
                   RealtimeService.instance.notifyLocalChange(
                     'VMC',
                     'Visite VMC Clôturée',
@@ -2574,7 +2615,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         leading: const BackButton(),
         title: Text(vmc.reference),
@@ -2639,6 +2680,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // 1. CARTE HERO COMMUNE
   // =========================================================================
   Widget _buildHeroCard() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     IconData heroIcon = Icons.verified_user;
     Color iconColor = AppColors.primary;
     if (isSafetyMoment) {
@@ -2655,12 +2697,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.03),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
             blurRadius: 12,
             offset: const Offset(0, 4),
           ),
@@ -2700,15 +2742,15 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.primaryLight,
+                            color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
                             vmc.code,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 9,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.primaryDark,
+                              color: isDark ? const Color(0xFF86EFAC) : AppColors.primaryDark,
                             ),
                           ),
                         ),
@@ -2717,10 +2759,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     const SizedBox(height: 4),
                     Text(
                       vmc.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                         height: 1.3,
                       ),
                     ),
@@ -2745,7 +2787,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             ],
           ),
           const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
           const SizedBox(height: 14),
           Row(
             children: [
@@ -2754,10 +2796,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               Expanded(
                 child: Text(
                   vmc.site,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -2776,21 +2818,21 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFF7ED),
+                    color: isDark ? const Color(0xFF7C2D12).withValues(alpha: 0.3) : const Color(0xFFFFF7ED),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: const Color(0xFFFED7AA)),
+                    border: Border.all(color: isDark ? const Color(0xFFEA580C).withValues(alpha: 0.4) : const Color(0xFFFED7AA)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.map_outlined, size: 13, color: Color(0xFFEA580C)),
-                      SizedBox(width: 4),
+                    children: [
+                      Icon(Icons.map_outlined, size: 13, color: isDark ? const Color(0xFFFDBA74) : const Color(0xFFEA580C)),
+                      const SizedBox(width: 4),
                       Text(
                         "Carte",
                         style: TextStyle(
                           fontSize: 10.5,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFFEA580C),
+                          color: isDark ? const Color(0xFFFDBA74) : const Color(0xFFEA580C),
                         ),
                       ),
                     ],
@@ -2798,14 +2840,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 ),
               ),
               const SizedBox(width: 10),
-              const Icon(Icons.calendar_today,
-                  size: 14, color: AppColors.textSecondary),
+              Icon(Icons.calendar_today,
+                  size: 14, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
               const SizedBox(width: 6),
               Text(
                 vmc.date,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 12,
-                  color: AppColors.textSecondary,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                 ),
               ),
             ],
@@ -2813,19 +2855,19 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           const SizedBox(height: 10),
           Row(
             children: [
-              const CircleAvatar(
+              CircleAvatar(
                 radius: 12,
-                backgroundColor: AppColors.primaryLight,
-                child: Icon(Icons.person, size: 14, color: AppColors.primary),
+                backgroundColor: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
+                child: const Icon(Icons.person, size: 14, color: AppColors.primary),
               ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   "Leader / Évaluateur : ${vmc.inspector}",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -2840,25 +2882,26 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // 2. CORPS POUR LES INSPECTIONS (Station, Camion, Magasins, Dépôt)
   // =========================================================================
   Widget _buildInspectionBody() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Détails de la visite
-        const Text(
+        Text(
           "Détails de l'Inspection Terrain",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: Column(
             children: [
@@ -2866,7 +2909,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               _buildDivider(),
               _buildDetailRow("Code formulaire", vmc.code),
               _buildDivider(),
-              _buildDetailRow("Accompagnateurs", "Mireille R. (HSSE), Chef de quart"),
+              _buildDetailRow("Accompagnateurs", accompanyingPerson ?? vmc.rawData?['accompanying_person']?.toString() ?? 'Non spécifié'),
               _buildDivider(),
               _buildDetailRow("Taux de conformité", "${(vmc.complianceRate * 100).toInt()}%"),
               _buildDivider(),
@@ -2884,10 +2927,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             const SizedBox(width: 8),
             Text(
               "Grille de Contrôle (${vmcItems.length} points)",
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const Spacer(),
@@ -2905,9 +2948,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: Column(
             children: List.generate(vmcItems.length, (index) {
@@ -2928,11 +2971,11 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               final String label =
                   isYes ? "Conforme" : (isNo ? "Écart" : "N/A");
               final Color badgeBg = isYes
-                  ? const Color(0xFFDCFCE7)
-                  : (isNo ? const Color(0xFFFEE2E2) : const Color(0xFFF1F5F9));
+                  ? (isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFDCFCE7))
+                  : (isNo ? (isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2)) : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)));
               final Color badgeTextColor = isYes
-                  ? const Color(0xFF15803D)
-                  : (isNo ? const Color(0xFFB91C1C) : const Color(0xFF64748B));
+                  ? (isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D))
+                  : (isNo ? (isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C)) : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)));
 
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 5),
@@ -2952,9 +2995,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                             "${item['num'] ?? (index + 1)}. ${item['title']}",
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textPrimary,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                             ),
                           ),
                         ),
@@ -2983,10 +3026,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         padding: const EdgeInsets.only(left: 24, top: 2),
                         child: Text(
                           "Obs: ${item['obs']}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontStyle: FontStyle.italic,
-                            color: AppColors.textSecondary,
+                            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                           ),
                         ),
                       ),
@@ -3007,27 +3050,27 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           children: [
             const Icon(Icons.thumb_up_alt, size: 18, color: Color(0xFF15803D)),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               "Points Positifs Constatés",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
+                color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.4) : const Color(0xFFDCFCE7),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 "${vmcItems.where((i) => i['answer'] == 'OUI').length} points",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF15803D),
+                  color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
                 ),
               ),
             ),
@@ -3041,9 +3084,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF0FDF4),
+                  color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.25) : const Color(0xFFF0FDF4),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFBBF7D0)),
+                  border: Border.all(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.4) : const Color(0xFFBBF7D0)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -3060,10 +3103,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                             children: [
                               Text(
                                 "Point ${it['num']}: ${it['title']}",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
-                                  color: Color(0xFF166534),
+                                  color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF166534),
                                 ),
                               ),
                               if (it['obs'] != null &&
@@ -3072,9 +3115,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                   padding: const EdgeInsets.only(top: 4),
                                   child: Text(
                                     "Obs: ${it['obs']}",
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF15803D),
+                                      color: isDark ? const Color(0xFFBBF7D0) : const Color(0xFF15803D),
                                     ),
                                   ),
                                 ),
@@ -3095,13 +3138,13 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
             ),
-            child: const Text(
+            child: Text(
               "Aucun point évalué conforme pour le moment.",
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
             ),
           ),
 
@@ -3113,27 +3156,27 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             const Icon(Icons.warning_amber_rounded,
                 size: 20, color: Color(0xFFDC2626)),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               "Écarts & Risques Identifiés",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const Spacer(),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xFFFEE2E2),
+                color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.4) : const Color(0xFFFEE2E2),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Text(
                 "${vmcItems.where((i) => i['answer'] == 'NON').length} écart(s)",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFB91C1C),
+                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
                 ),
               ),
             ),
@@ -3147,9 +3190,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               child: Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF2F2),
+                  color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.25) : const Color(0xFFFEF2F2),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFECACA)),
+                  border: Border.all(color: isDark ? const Color(0xFFDC2626).withValues(alpha: 0.4) : const Color(0xFFFECACA)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -3166,10 +3209,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                             children: [
                               Text(
                                 "Écart • Point ${it['num']}: ${it['title']}",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 13,
-                                  color: Color(0xFF991B1B),
+                                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
                                 ),
                               ),
                               if (it['obs'] != null &&
@@ -3178,9 +3221,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                                   padding: const EdgeInsets.only(top: 4),
                                   child: Text(
                                     "Constat: ${it['obs']}",
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                      color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                     ),
                                   ),
                                 ),
@@ -3228,18 +3271,18 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
+              color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.25) : const Color(0xFFF0FDF4),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
+              border: Border.all(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.4) : const Color(0xFFBBF7D0)),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 20),
+                const Icon(Icons.check_circle, color: Color(0xFF16A34A), size: 20),
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     "Aucun écart constaté lors de cette visite managériale.",
-                    style: TextStyle(fontSize: 12, color: Color(0xFF15803D)),
+                    style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D)),
                   ),
                 ),
               ],
@@ -3253,6 +3296,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // 3. CORPS POUR SAFETY MOMENT (Quart d'Heure Sécurité)
   // =========================================================================
   Widget _buildSafetyMomentBody() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3260,9 +3304,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFFFFBEB),
+            color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.25) : const Color(0xFFFFFBEB),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFFDE68A)),
+            border: Border.all(color: isDark ? const Color(0xFFF59E0B).withValues(alpha: 0.4) : const Color(0xFFFDE68A)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3278,13 +3322,13 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     child: const Icon(Icons.flash_on, color: Colors.white, size: 18),
                   ),
                   const SizedBox(width: 10),
-                  const Expanded(
+                  Expanded(
                     child: Text(
                       "Quart d'Heure Sécurité - 15 min Chrono",
                       style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF92400E),
+                        color: isDark ? const Color(0xFFFCD34D) : const Color(0xFF92400E),
                       ),
                     ),
                   ),
@@ -3293,16 +3337,16 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               const SizedBox(height: 10),
               Text(
                 "Thème : ${vmc.theme ?? 'Risques électrostatiques & Dépotage citernes'}",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: isDark ? Colors.white : AppColors.textPrimary,
                 ),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 "Objectif : Sensibiliser l'équipe aux risques immédiats, réviser la procédure d'urgence et assurer la coordination terrain.",
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary, height: 1.4),
               ),
             ],
           ),
@@ -3311,21 +3355,21 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         const SizedBox(height: 20),
 
         // Consignes abordées
-        const Text(
+        Text(
           "Consignes et Démonstrations Abordées",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: Column(
             children: List.generate(vmcItems.length, (index) {
@@ -3340,9 +3384,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     Expanded(
                       child: Text(
                         "${it['num'] ?? (index + 1)}. ${it['title']}",
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -3362,10 +3406,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             const SizedBox(width: 8),
             Text(
               "Participants Présents (${participants.length})",
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const Spacer(),
@@ -3391,18 +3435,18 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: participants.isEmpty
-              ? const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 12),
+              ? Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
                   child: Center(
                     child: Text(
                       "Aucun participant enregistré.\nCliquez sur Ajouter pour sélectionner un personnel présent.",
                       textAlign: TextAlign.center,
-                      style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                     ),
                   ),
                 )
@@ -3426,10 +3470,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                           Expanded(
                             child: Text(
                               "${p['name']} • ${p['role']}",
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textPrimary,
+                                color: isDark ? Colors.white : AppColors.textPrimary,
                               ),
                             ),
                           ),
@@ -3491,12 +3535,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         const SizedBox(height: 20),
 
         // Questions & Retours de l'équipe
-        const Text(
+        Text(
           "Retours d'Expérience & Questions de l'Équipe",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 10),
@@ -3504,9 +3548,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3516,10 +3560,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               Expanded(
                 child: Text(
                   safetyMomentFeedback,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1.4,
-                    color: AppColors.textPrimary,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
               ),
@@ -3531,12 +3575,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   }
 
   // =========================================================================
-  // 4. CORPS POUR SAFETY AWARENESS (Causerie / Sensibilisation)
-  // =========================================================================
-  // =========================================================================
   // 4. CORPS POUR SAFETY TRAINING / SAFETY AWARENESS (PHOTO 6 REGISTRE GALANA)
   // =========================================================================
   Widget _buildSafetyAwarenessBody() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3545,12 +3587,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.03),
+                color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.03),
                 blurRadius: 10,
                 offset: const Offset(0, 3),
               ),
@@ -3571,18 +3613,18 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                         color: Color(0xFF007A78), size: 20),
                   ),
                   const SizedBox(width: 10),
-                  const Text(
+                  Text(
                     "Leader Commitment",
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
-              const Divider(height: 1),
+              Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
               const SizedBox(height: 12),
               _buildLeaderInfoRow("Nom :", vmc.inspector),
               const SizedBox(height: 8),
@@ -3603,19 +3645,19 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   "Détails de la formation",
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: isDark ? Colors.white : AppColors.textPrimary,
                   ),
                 ),
                 Text(
                   "${awarenessSessions.length} sessions enregistrées",
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -3644,9 +3686,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         // Liste des sessions du registre
         Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: Column(
             children: List.generate(awarenessSessions.length, (index) {
@@ -3663,7 +3705,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                   border: index < awarenessSessions.length - 1
                       ? Border(
                           bottom: BorderSide(
-                              color: AppColors.border.withValues(alpha: 0.6)))
+                              color: isDark ? const Color(0xFF334155) : AppColors.border.withValues(alpha: 0.6)))
                       : null,
                 ),
                 child: Row(
@@ -3673,15 +3715,15 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                       padding:
                           const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         date,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -3700,23 +3742,23 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                           const SizedBox(height: 6),
                           Text(
                             title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                             ),
                           ),
                           const SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(Icons.person_outline,
-                                  size: 14, color: AppColors.textSecondary),
+                              Icon(Icons.person_outline,
+                                  size: 14, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                               const SizedBox(width: 4),
                               Text(
                                 "Intervenant : $speaker",
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
-                                  color: AppColors.textSecondary,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                 ),
                               ),
                             ],
@@ -3748,26 +3790,26 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
-          child: const Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 "(*) Type : formation, sensibilisation, induction, atelier",
                 style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textSecondary,
+                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                     fontStyle: FontStyle.italic),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 "(**) Volet : Santé, Sécurité, Sûreté, Environnement",
                 style: TextStyle(
                     fontSize: 11,
-                    color: AppColors.textSecondary,
+                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                     fontStyle: FontStyle.italic),
               ),
             ],
@@ -3804,6 +3846,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   }
 
   Widget _buildLeaderInfoRow(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3811,10 +3854,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           width: 80,
           child: Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: AppColors.textSecondary,
+              color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
             ),
           ),
         ),
@@ -3823,14 +3866,14 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
             padding: const EdgeInsets.only(bottom: 2),
             decoration: BoxDecoration(
               border: Border(
-                  bottom: BorderSide(color: Colors.grey.shade300, width: 0.8)),
+                  bottom: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300, width: 0.8)),
             ),
             child: Text(
               value,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
           ),
@@ -3911,6 +3954,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // 5. CORPS POUR SAFETY REPORT (Fiche de Remontée FOR01-HSSE-ACC)
   // =========================================================================
   Widget _buildSafetyReportBody() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -3918,9 +3962,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFFFEF2F2),
+            color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.25) : const Color(0xFFFEF2F2),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: const Color(0xFFFECACA)),
+            border: Border.all(color: isDark ? const Color(0xFFDC2626).withValues(alpha: 0.4) : const Color(0xFFFECACA)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3940,17 +3984,17 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           "Fiche de Remontée d'Anomalie (FOR01)",
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF991B1B),
+                            color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
                           ),
                         ),
                         Text(
                           "Condition dangereuse signalée le ${vmc.date}",
-                          style: const TextStyle(fontSize: 11, color: Color(0xFFB91C1C)),
+                          style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFFF87171) : const Color(0xFFB91C1C)),
                         ),
                       ],
                     ),
@@ -3974,12 +4018,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                 "Circonstances de l'événement :",
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFF991B1B),
+                  color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFF991B1B),
                 ),
               ),
               const SizedBox(height: 4),
@@ -3988,7 +4032,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                 style: TextStyle(
                   fontSize: 12,
                   height: 1.4,
-                  color: Colors.red.shade900,
+                  color: isDark ? const Color(0xFFFECACA) : Colors.red.shade900,
                 ),
               ),
             ],
@@ -3998,21 +4042,21 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         const SizedBox(height: 20),
 
         // Causes et analyse
-        const Text(
+        Text(
           "Analyse Terrain & Causes Identifiées",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: Column(
             children: [
@@ -4034,12 +4078,12 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           children: [
             const Icon(Icons.shield, size: 20, color: AppColors.primary),
             const SizedBox(width: 8),
-            const Text(
+            Text(
               "Mesures Conservatoires Immédiates",
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
             const Spacer(),
@@ -4058,9 +4102,9 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
           width: double.infinity,
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
+            color: isDark ? const Color(0xFF064E3B).withValues(alpha: 0.25) : const Color(0xFFF0FDF4),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFBBF7D0)),
+            border: Border.all(color: isDark ? const Color(0xFF059669).withValues(alpha: 0.4) : const Color(0xFFBBF7D0)),
           ),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -4070,10 +4114,10 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
               Expanded(
                 child: Text(
                   reportImmediateAction,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     height: 1.4,
-                    color: Color(0xFF15803D),
+                    color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF15803D),
                   ),
                 ),
               ),
@@ -4084,34 +4128,34 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
         const SizedBox(height: 20),
 
         // Action corrective liée
-        const Text(
+        Text(
           "Action Corrective Planifiée",
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.bold,
-            color: AppColors.textPrimary,
+            color: isDark ? Colors.white : AppColors.textPrimary,
           ),
         ),
         const SizedBox(height: 10),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
           ),
           child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFEF3C7),
+                  color: isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(Icons.build, size: 20, color: Color(0xFFB45309)),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -4120,13 +4164,13 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       "Assigné à : Superviseur Maintenance • Délai : 24h",
-                      style: TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                      style: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                     ),
                   ],
                 ),
@@ -4142,6 +4186,7 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // BOTTOM SHEET D'ACTIONS
   // =========================================================================
   Widget _buildBottomSheet() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final s = vmc.status.toLowerCase();
     final bool isPlanifiee =
         s.contains('planifi') || s.contains('brouillon') || s == 'draft';
@@ -4152,11 +4197,11 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
-          border: Border(top: BorderSide(color: AppColors.border)),
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
+          border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : AppColors.border)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
+              color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
               blurRadius: 10,
               offset: const Offset(0, -3),
             ),
@@ -4204,11 +4249,11 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: AppColors.border)),
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
+        border: Border(top: BorderSide(color: isDark ? const Color(0xFF334155) : AppColors.border)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.05),
             blurRadius: 10,
             offset: const Offset(0, -3),
           ),
@@ -4296,28 +4341,30 @@ class _VmcDetailPageState extends State<VmcDetailPage> {
   // WIDGETS HELPERS
   // =========================================================================
   Widget _buildDetailRow(String label, String value) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary)),
+              style: TextStyle(
+                  fontSize: 12, color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary)),
           Text(value,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary)),
+                  color: isDark ? Colors.white : AppColors.textPrimary)),
         ],
       ),
     );
   }
 
   Widget _buildDivider() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 6),
-      child: Divider(height: 1, color: Color(0xFFF1F5F9)),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
     );
   }
 }

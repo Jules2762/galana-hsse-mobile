@@ -63,6 +63,7 @@ class VmcCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
     final bool isAssignedToMe = ApiClient.isAssignedToCurrentUser(inspector);
     return InkWell(
       onTap: onTap,
@@ -70,9 +71,14 @@ class VmcCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isAssignedToMe ? const Color(0xFF93C5FD) : AppColors.border.withValues(alpha: 0.8), width: isAssignedToMe ? 1.5 : 1.0),
+          border: Border.all(
+            color: isDark
+                ? (isAssignedToMe ? const Color(0xFF3B82F6) : const Color(0xFF334155))
+                : (isAssignedToMe ? const Color(0xFF93C5FD) : AppColors.border.withValues(alpha: 0.8)),
+            width: isAssignedToMe ? 1.5 : 1.0,
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -91,15 +97,17 @@ class VmcCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: isDark
+                        ? const Color(0xFF0F9D58).withValues(alpha: 0.2)
+                        : AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
                     reference,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.primaryDark,
+                      color: isDark ? const Color(0xFF4ADE80) : AppColors.primaryDark,
                     ),
                   ),
                 ),
@@ -108,17 +116,17 @@ class VmcCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF1F5F9),
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       type,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF475569),
+                        color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                       ),
                     ),
                   ),
@@ -131,21 +139,29 @@ class VmcCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                         margin: const EdgeInsets.only(right: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFEF3C7),
+                          color: isDark
+                              ? const Color(0xFF78350F).withValues(alpha: 0.6)
+                              : const Color(0xFFFEF3C7),
                           borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFFDE68A)),
+                          border: Border.all(
+                            color: isDark ? const Color(0xFFB45309) : const Color(0xFFFDE68A),
+                          ),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.cloud_upload_outlined, size: 11, color: Color(0xFFD97706)),
-                            SizedBox(width: 3),
+                            Icon(
+                              Icons.cloud_upload_outlined,
+                              size: 11,
+                              color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFD97706),
+                            ),
+                            const SizedBox(width: 3),
                             Text(
                               "Sync",
                               style: TextStyle(
                                 fontSize: 9.5,
                                 fontWeight: FontWeight.bold,
-                                color: Color(0xFFB45309),
+                                color: isDark ? const Color(0xFFFDE68A) : const Color(0xFFB45309),
                               ),
                             ),
                           ],
@@ -172,16 +188,15 @@ class VmcCard extends StatelessWidget {
               ],
             ),
 
-
             const SizedBox(height: 12),
 
             // ==================== TITRE ====================
             Text(
               title,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
                 height: 1.3,
               ),
             ),
@@ -191,27 +206,35 @@ class VmcCard extends StatelessWidget {
             // ==================== SITE & DATE ====================
             Row(
               children: [
-                const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 14,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     site,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                 ),
-                const Icon(Icons.calendar_today_outlined, size: 13, color: AppColors.textSecondary),
+                Icon(
+                  Icons.calendar_today_outlined,
+                  size: 13,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
                 Text(
                   date,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
-                    color: AppColors.textSecondary,
+                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -224,11 +247,13 @@ class VmcCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 10,
-                  backgroundColor: isAssignedToMe ? const Color(0xFFDBEAFE) : AppColors.primaryLight,
+                  backgroundColor: isDark
+                      ? (isAssignedToMe ? const Color(0xFF1E3A8A) : const Color(0xFF064E2A))
+                      : (isAssignedToMe ? const Color(0xFFDBEAFE) : AppColors.primaryLight),
                   child: Icon(
                     isAssignedToMe ? Icons.person_pin : Icons.person,
                     size: 12,
-                    color: isAssignedToMe ? const Color(0xFF2563EB) : AppColors.primary,
+                    color: isAssignedToMe ? const Color(0xFF3B82F6) : AppColors.primary,
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -237,10 +262,10 @@ class VmcCard extends StatelessWidget {
                     inspector,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
                 ),
@@ -249,28 +274,37 @@ class VmcCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFEFF6FF),
+                      color: isDark
+                          ? const Color(0xFF1E3A8A).withValues(alpha: 0.6)
+                          : const Color(0xFFEFF6FF),
                       borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE),
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.assignment_ind, size: 10, color: Color(0xFF2563EB)),
-                        SizedBox(width: 3),
+                        Icon(
+                          Icons.assignment_ind,
+                          size: 10,
+                          color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB),
+                        ),
+                        const SizedBox(width: 3),
                         Text(
                           "Attribuée",
                           style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF1D4ED8),
+                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
                           ),
                         ),
                       ],
                     ),
                   ),
                 ],
-                if (complianceRate != null)
+                if (complianceRate != null) ...[
+                  const SizedBox(width: 6),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -290,6 +324,7 @@ class VmcCard extends StatelessWidget {
                       ),
                     ),
                   ),
+                ],
               ],
             ),
 
@@ -299,9 +334,11 @@ class VmcCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -327,7 +364,11 @@ class VmcCard extends StatelessWidget {
                       ),
                     ),
                     const Spacer(),
-                    const Icon(Icons.chevron_right, size: 16, color: AppColors.textSecondary),
+                    Icon(
+                      Icons.chevron_right,
+                      size: 16,
+                      color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                    ),
                   ],
                 ),
               ),

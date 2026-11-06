@@ -119,15 +119,19 @@ class EquipmentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border.withValues(alpha: 0.8)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : AppColors.border.withValues(alpha: 0.8),
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -145,7 +149,9 @@ class EquipmentCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primaryLight,
+                    color: isDark
+                        ? const Color(0xFF0F9D58).withValues(alpha: 0.2)
+                        : AppColors.primaryLight,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(_equipmentIcon, size: 18, color: AppColors.primary),
@@ -157,18 +163,18 @@ class EquipmentCard extends StatelessWidget {
                     children: [
                       Text(
                         tagNumber,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       Text(
                         type,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: AppColors.textSecondary,
+                          color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                         ),
                       ),
                     ],
@@ -245,10 +251,10 @@ class EquipmentCard extends StatelessWidget {
             // ==================== DÉSIGNATION ====================
             Text(
               designation,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: isDark ? Colors.white : AppColors.textPrimary,
               ),
             ),
 
@@ -257,16 +263,20 @@ class EquipmentCard extends StatelessWidget {
             // ==================== LOCALISATION ====================
             Row(
               children: [
-                const Icon(Icons.location_on_outlined, size: 14, color: AppColors.textSecondary),
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 14,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     "$site • $location",
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                     ),
                   ),
                 ),
@@ -274,7 +284,7 @@ class EquipmentCard extends StatelessWidget {
             ),
 
             const SizedBox(height: 12),
-            const Divider(height: 1, color: Color(0xFFF1F5F9)),
+            Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
             const SizedBox(height: 12),
 
             // ==================== INFOS D'INSPECTION & ACTIONS ====================
@@ -290,10 +300,10 @@ class EquipmentCard extends StatelessWidget {
                           const SizedBox(width: 4),
                           Text(
                             "Pression: $pressureStatus",
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w500,
-                              color: AppColors.textPrimary,
+                              color: isDark ? const Color(0xFFCBD5E1) : AppColors.textPrimary,
                             ),
                           ),
                         ],
@@ -301,9 +311,9 @@ class EquipmentCard extends StatelessWidget {
                       const SizedBox(height: 3),
                       Text(
                         "Dernier: $lastControlDate • Échéance: $nextDueDate",
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
-                          color: AppColors.textSecondary,
+                          color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                         ),
                       ),
                     ],

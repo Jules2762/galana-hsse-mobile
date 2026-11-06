@@ -178,6 +178,7 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
 
   void _showAddCommentDialog() {
     final textController = TextEditingController(text: current.comment ?? "");
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -190,9 +191,9 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
             top: 20,
             bottom: MediaQuery.of(context).viewInsets.bottom + 20,
           ),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF1E293B) : Colors.white,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -203,23 +204,23 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.comment_outlined,
+                  const Icon(Icons.comment_outlined,
                       color: AppColors.primary, size: 22),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Text(
                     "Observation terrain",
                     style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -229,6 +230,7 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                 controller: textController,
                 maxLines: 3,
                 autofocus: true,
+                style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
                 decoration: const InputDecoration(
                   hintText: "Saisissez votre constat ou remarque terrain...",
                 ),
@@ -282,7 +284,9 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
       context: context,
       barrierDismissible: false,
       builder: (context) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         return AlertDialog(
+          backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(24),
           ),
@@ -291,7 +295,7 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primaryLight,
+                  color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
@@ -301,10 +305,14 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                 ),
               ),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Text(
                   "Clôturer l'audit terrain",
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
                 ),
               ),
             ],
@@ -313,17 +321,22 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 "Toutes les vérifications ont été passées en revue.",
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.lightBackground,
+                  color: isDark ? const Color(0xFF0F172A) : AppColors.lightBackground,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : AppColors.border,
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -345,16 +358,16 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                 ),
               ),
               const SizedBox(height: 14),
-              const Row(
+              Row(
                 children: [
-                  Icon(Icons.person_pin, size: 16, color: AppColors.primary),
-                  SizedBox(width: 6),
+                  const Icon(Icons.person_pin, size: 16, color: AppColors.primary),
+                  const SizedBox(width: 6),
                   Text(
                     "Visa : Jules Rakoto (Inspecteur HSSE)",
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: isDark ? Colors.white : AppColors.textPrimary,
                     ),
                   ),
                 ],
@@ -410,11 +423,12 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final double globalProgress = (currentIndex + 1) / totalCount;
     final bool isLast = currentIndex == totalCount - 1;
 
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: InspectionAppBar(
         title: "Contrôle terrain en cours",
       ),
@@ -427,11 +441,12 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.transparent),
                     boxShadow: [
                       BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
+                        color: Colors.black.withValues(alpha: isDark ? 0.2 : 0.04),
                         blurRadius: 12,
                         offset: const Offset(0, 4),
                       ),
@@ -450,15 +465,15 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                                 vertical: 6,
                               ),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFE6F4EA),
+                                color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : const Color(0xFFE6F4EA),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
                                 current.section,
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: AppColors.primaryDark,
+                                style: TextStyle(
+                                  color: isDark ? const Color(0xFF86EFAC) : AppColors.primaryDark,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w700,
                                 ),
@@ -468,10 +483,10 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                           const SizedBox(width: 8),
                           Text(
                             "Question ${currentIndex + 1}/$totalCount",
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
-                              color: AppColors.textSecondary,
+                              color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                             ),
                           ),
                         ],
@@ -482,11 +497,11 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                       // ==================== QUESTION TEXT ====================
                       Text(
                         current.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 20,
                           height: 1.35,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
 
@@ -494,10 +509,10 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
 
                       Text(
                         current.hint,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
                           height: 1.5,
-                          color: AppColors.textSecondary,
+                          color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                         ),
                       ),
 
@@ -637,13 +652,13 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                                   horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: current.photoCount > 0
-                                    ? AppColors.primaryLight
-                                    : const Color(0xFFF1F5F9),
+                                    ? (isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.25) : AppColors.primaryLight)
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: current.photoCount > 0
                                       ? AppColors.primary
-                                      : AppColors.border,
+                                      : (isDark ? const Color(0xFF475569) : AppColors.border),
                                 ),
                               ),
                               child: Row(
@@ -653,8 +668,8 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                                     Icons.camera_alt_outlined,
                                     size: 16,
                                     color: current.photoCount > 0
-                                        ? AppColors.primaryDark
-                                        : AppColors.textSecondary,
+                                        ? (isDark ? const Color(0xFF86EFAC) : AppColors.primaryDark)
+                                        : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -665,8 +680,8 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: current.photoCount > 0
-                                          ? AppColors.primaryDark
-                                          : AppColors.textSecondary,
+                                          ? (isDark ? const Color(0xFF86EFAC) : AppColors.primaryDark)
+                                          : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                     ),
                                   ),
                                 ],
@@ -685,13 +700,13 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                                   horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: current.comment != null
-                                    ? const Color(0xFFFEF3C7)
-                                    : const Color(0xFFF1F5F9),
+                                    ? (isDark ? const Color(0xFF78350F).withValues(alpha: 0.3) : const Color(0xFFFEF3C7))
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                                 borderRadius: BorderRadius.circular(10),
                                 border: Border.all(
                                   color: current.comment != null
                                       ? const Color(0xFFD97706)
-                                      : AppColors.border,
+                                      : (isDark ? const Color(0xFF475569) : AppColors.border),
                                 ),
                               ),
                               child: Row(
@@ -701,8 +716,8 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                                     Icons.comment_outlined,
                                     size: 16,
                                     color: current.comment != null
-                                        ? const Color(0xFFB45309)
-                                        : AppColors.textSecondary,
+                                        ? (isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309))
+                                        : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                   ),
                                   const SizedBox(width: 6),
                                   Text(
@@ -713,8 +728,8 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                                       fontSize: 12,
                                       fontWeight: FontWeight.w600,
                                       color: current.comment != null
-                                          ? const Color(0xFFB45309)
-                                          : AppColors.textSecondary,
+                                          ? (isDark ? const Color(0xFFFCD34D) : const Color(0xFFB45309))
+                                          : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                     ),
                                   ),
                                 ],
@@ -790,9 +805,9 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                   width: 52,
                   height: 52,
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: isDark ? const Color(0xFF1E293B) : Colors.white,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: AppColors.border),
+                    border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
                   ),
                   child: IconButton(
                     onPressed: currentIndex > 0
@@ -805,7 +820,7 @@ class _InspectionQuestionPageState extends State<InspectionQuestionPage> {
                     icon: Icon(
                       Icons.chevron_left,
                       color: currentIndex > 0
-                          ? AppColors.textPrimary
+                          ? (isDark ? Colors.white : AppColors.textPrimary)
                           : Colors.grey.shade400,
                     ),
                   ),

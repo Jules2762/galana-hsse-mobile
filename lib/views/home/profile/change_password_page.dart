@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/widgets/bottom_quick_action.dart';
 
@@ -216,13 +217,14 @@ class _ChangePasswordPageState
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor:
-          AppColors.lightBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       appBar: AppBar(
-        title: const Text(
-          "Changer le mot de passe",
+        title: Text(
+          context.l10n.changePassword,
         ),
       ),
 
@@ -242,10 +244,13 @@ class _ChangePasswordPageState
                 ),
 
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius:
                       BorderRadius.circular(
                     24,
+                  ),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                   ),
                 ),
 
@@ -566,7 +571,7 @@ class _ChangePasswordPageState
       bottomNavigationBar:
           BottomQuickAction(
         primaryText:
-            "Modifier le mot de passe",
+            context.l10n.changePassword,
 
         loading: loading,
 
@@ -574,7 +579,7 @@ class _ChangePasswordPageState
             changePassword,
 
         secondaryText:
-            "Annuler",
+            context.l10n.cancel,
 
         onSecondaryPressed:
             () {

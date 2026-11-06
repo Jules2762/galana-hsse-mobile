@@ -16,17 +16,20 @@ class AttachmentAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       onTap: onTap,
       child: Container(
       height: 80,
 
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(14),
 
         border: Border.all(
-          color: selected ? const Color(0xFF0F9D58) : const Color(0xFFE2E8F0),
+          color: selected
+              ? const Color(0xFF0F9D58)
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
         ),
       ),
 
@@ -36,7 +39,9 @@ class AttachmentAction extends StatelessWidget {
         children: [
           Icon(
             icon,
-            color: selected ? const Color(0xFF0F9D58) : Colors.black54,
+            color: selected
+                ? const Color(0xFF0F9D58)
+                : (isDark ? Colors.white70 : Colors.black54),
           ),
 
           const SizedBox(height: 8),
@@ -45,12 +50,15 @@ class AttachmentAction extends StatelessWidget {
             title,
             style: TextStyle(
               fontSize: 12,
-              color: selected ? const Color(0xFF0F9D58) : Colors.black87,
+              color: selected
+                  ? const Color(0xFF0F9D58)
+                  : (isDark ? Colors.white : Colors.black87),
             ),
           ),
         ],
       ),
     )
   ,
-    );}
+    );
+  }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
@@ -20,181 +21,207 @@ class SyncStatusBanner extends StatelessWidget {
 
         // 1. ÉTAT : SYNCHRONISATION EN COURS
         if (isSyncing) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: Row(
-              children: [
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.2,
-                    valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+          return InkWell(
+            onTap: () => Navigator.pushNamed(context, AppRoutes.syncQueue),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFEFF6FF),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFBFDBFE)),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        "Synchronisation en ligne en cours...",
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E40AF),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          "Synchronisation en ligne en cours...",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF1E40AF),
+                          ),
                         ),
-                      ),
-                      Text(
-                        "$pendingCount inspection(s) en cours d'envoi vers l'API Galana",
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: Color(0xFF3B82F6),
+                        Text(
+                          "$pendingCount inspection(s) en cours d'envoi • Touchez pour voir",
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: Color(0xFF3B82F6),
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  const Icon(Icons.chevron_right, size: 18, color: Color(0xFF3B82F6)),
+                ],
+              ),
             ),
           );
         }
 
         // 2. ÉTAT : HORS-LIGNE
         if (!isOnline) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFFDE68A)),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFEF3C7),
-                    borderRadius: BorderRadius.circular(8),
+          return InkWell(
+            onTap: () => Navigator.pushNamed(context, AppRoutes.syncQueue),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFFBEB),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFFDE68A)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEF3C7),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.cloud_off_rounded,
+                      color: Color(0xFFD97706),
+                      size: 18,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.cloud_off_rounded,
-                    color: Color(0xFFD97706),
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text(
-                            "Mode Hors-ligne actif",
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF92400E),
-                            ),
-                          ),
-                          if (pendingCount > 0) ...[
-                            const SizedBox(width: 6),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF59E0B),
-                                borderRadius: BorderRadius.circular(10),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Text(
+                              "Mode Hors-ligne actif",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF92400E),
                               ),
-                              child: Text(
-                                "$pendingCount en attente",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                            if (pendingCount > 0) ...[
+                              const SizedBox(width: 6),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF59E0B),
+                                  borderRadius: BorderRadius.circular(10),
+                                ),
+                                child: Text(
+                                  "$pendingCount en attente",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
-                      ),
-                      const SizedBox(height: 2),
-                      const Text(
-                        "Inspections sauvegardées localement • Envoi auto dès reconnexion",
-                        style: TextStyle(
-                          fontSize: 10.5,
-                          color: Color(0xFFB45309),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.refresh, size: 20, color: Color(0xFFD97706)),
-                  tooltip: "Tester la connexion",
-                  onPressed: () async {
-                    final online = await sync.checkConnectivity();
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          duration: const Duration(seconds: 2),
-                          backgroundColor: online ? const Color(0xFF15803D) : const Color(0xFFB45309),
-                          content: Text(
-                            online
-                                ? "Connexion rétablie ! Lancement de la synchronisation..."
-                                : "Toujours hors-ligne. Les données restent protégées en local.",
+                        const SizedBox(height: 2),
+                        const Text(
+                          "Sauvegardé localement • Touchez pour gérer la file",
+                          style: TextStyle(
+                            fontSize: 10.5,
+                            color: Color(0xFFB45309),
                           ),
                         ),
-                      );
-                    }
-                  },
-                ),
-              ],
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.refresh, size: 20, color: Color(0xFFD97706)),
+                    tooltip: "Tester la connexion",
+                    onPressed: () async {
+                      final online = await sync.checkConnectivity();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            duration: const Duration(seconds: 2),
+                            backgroundColor: online ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                            content: Text(
+                              online
+                                  ? "Connexion rétablie ! Lancement de la synchronisation..."
+                                  : "Toujours hors-ligne. Les données restent protégées en local.",
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  const Icon(Icons.chevron_right, size: 18, color: Color(0xFFD97706)),
+                ],
+              ),
             ),
           );
         }
 
         // 3. ÉTAT : EN LIGNE AVEC PENDING SYNC
         if (pendingCount > 0) {
-          return Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0FDF4),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFBBF7D0)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.sync, color: Color(0xFF16A34A), size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    "Connexion active : $pendingCount inspection(s) prête(s) à être synchronisée(s)",
-                    style: const TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF15803D),
+          return InkWell(
+            onTap: () => Navigator.pushNamed(context, AppRoutes.syncQueue),
+            borderRadius: BorderRadius.circular(14),
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF0FDF4),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFFBBF7D0)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.sync, color: Color(0xFF16A34A), size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "$pendingCount inspection(s) prête(s) à être synchronisée(s)",
+                          style: const TextStyle(
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF15803D),
+                          ),
+                        ),
+                        const Text(
+                          "Touchez pour voir le détail des données",
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF16A34A),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    visualDensity: VisualDensity.compact,
-                    foregroundColor: const Color(0xFF15803D),
+                  TextButton(
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      visualDensity: VisualDensity.compact,
+                      foregroundColor: const Color(0xFF15803D),
+                    ),
+                    onPressed: () => sync.syncAll(),
+                    child: const Text("Synchroniser", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
                   ),
-                  onPressed: () => sync.syncAll(),
-                  child: const Text("Synchroniser", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 11.5)),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         }
@@ -280,6 +307,7 @@ class SyncStatusBanner extends StatelessWidget {
 
 
   static void _showQueueDetailsSheet(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -291,9 +319,9 @@ class SyncStatusBanner extends StatelessWidget {
             final sync = SyncService.instance;
             return Container(
               padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
                 child: Column(
@@ -305,7 +333,7 @@ class SyncStatusBanner extends StatelessWidget {
                         width: 40,
                         height: 4,
                         decoration: BoxDecoration(
-                          color: Colors.grey.shade300,
+                          color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                           borderRadius: BorderRadius.circular(10),
                         ),
                       ),
@@ -325,11 +353,18 @@ class SyncStatusBanner extends StatelessWidget {
                             children: [
                               Text(
                                 sync.isOnline ? "Connectivité API Galana : En ligne" : "Connectivité API Galana : Hors-ligne",
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                ),
                               ),
                               Text(
                                 "${sync.pendingCount} action(s) dans la file d'attente locale",
-                                style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                                ),
                               ),
                             ],
                           ),
@@ -337,24 +372,31 @@ class SyncStatusBanner extends StatelessWidget {
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const Divider(height: 1),
+                    Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                     const SizedBox(height: 12),
                     if (sync.queue.isEmpty)
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 24),
                         alignment: Alignment.center,
-                        child: const Column(
+                        child: Column(
                           children: [
-                            Icon(Icons.check_circle_outline, color: Color(0xFF16A34A), size: 40),
-                            SizedBox(height: 8),
+                            const Icon(Icons.check_circle_outline, color: Color(0xFF16A34A), size: 40),
+                            const SizedBox(height: 8),
                             Text(
                               "Toutes les inspections sont à jour !",
-                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 14,
+                                color: isDark ? Colors.white : const Color(0xFF0F172A),
+                              ),
                             ),
-                            SizedBox(height: 4),
+                            const SizedBox(height: 4),
                             Text(
                               "Aucune modification en attente sur l'appareil.",
-                              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                              ),
                             ),
                           ],
                         ),
@@ -366,16 +408,16 @@ class SyncStatusBanner extends StatelessWidget {
                           margin: const EdgeInsets.only(bottom: 8),
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
+                            color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.border),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
                           ),
                           child: Row(
                             children: [
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primaryLight,
+                                  color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Icon(Icons.upload, size: 16, color: AppColors.primary),
@@ -387,11 +429,18 @@ class SyncStatusBanner extends StatelessWidget {
                                   children: [
                                     Text(
                                       item.title,
-                                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                      ),
                                     ),
                                     Text(
                                       "${item.method} ${item.endpoint}",
-                                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -416,10 +465,32 @@ class SyncStatusBanner extends StatelessWidget {
                         );
                       }),
                     const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: const Icon(Icons.queue_rounded, size: 18),
+                        label: const Text("Ouvrir la file d'attente complète", style: TextStyle(fontWeight: FontWeight.bold)),
+                        onPressed: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, AppRoutes.syncQueue);
+                        },
+                      ),
+                    ),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: OutlinedButton(
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: isDark ? Colors.white : null,
+                              side: isDark ? const BorderSide(color: Color(0xFF334155)) : null,
+                            ),
                             onPressed: () => Navigator.pop(context),
                             child: const Text("Fermer"),
                           ),

@@ -18,6 +18,8 @@ class QuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
@@ -32,7 +34,9 @@ class QuickAction extends StatelessWidget {
                 width: 52,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8F5EE),
+                  color: isDark
+                      ? const Color(0xFF0F9D58).withValues(alpha: 0.2)
+                      : const Color(0xFFE8F5EE),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
@@ -50,9 +54,10 @@ class QuickAction extends StatelessWidget {
               textAlign: TextAlign.center,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
+                color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF1E293B),
               ),
             ),
           ],

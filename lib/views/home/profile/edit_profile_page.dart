@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 
 class EditProfilePage extends StatefulWidget {
@@ -19,6 +20,7 @@ class _EditProfilePageState
   late final TextEditingController phoneController;
   late final TextEditingController functionController;
   late final TextEditingController departmentController;
+  bool isLoading = false;
 
   @override
   void initState() {
@@ -28,7 +30,8 @@ class _EditProfilePageState
         ("${user?['first_name'] ?? 'Jules'} ${user?['last_name'] ?? 'ARIMANANA'}").trim();
     nameController = TextEditingController(text: fullName);
     emailController = TextEditingController(text: user?['email']?.toString() ?? "julesari_ext@galana.mg");
-    phoneController = TextEditingController(text: user?['phone']?.toString() ?? "+261 34 12 345 67");
+    final rawPhone = user?['phone_number']?.toString() ?? (user?['phone']?.toString() ?? "");
+    phoneController = TextEditingController(text: rawPhone);
     functionController = TextEditingController(text: user?['job_title']?.toString() ?? "Superviseur Terrain HSSE");
     departmentController = TextEditingController(text: user?['department']?.toString() ?? "Opérations & Sûreté");
   }
@@ -43,31 +46,76 @@ class _EditProfilePageState
     super.dispose();
   }
 
-  void saveProfile() {
+  Future<void> saveProfile() async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
+    setState(() => isLoading = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          "Profil mis à jour avec succès",
+    final user = ApiClient.currentUser;
+    final userId = user?['id'];
+    final phone = phoneController.text.trim();
+    final nameParts = nameController.text.trim().split(' ');
+    final firstName = nameParts.first;
+    final lastName = nameParts.length > 1 ? nameParts.sublist(1).join(' ') : '';
+
+    try {
+      if (userId != null) {
+        await ApiClient.dio.put('/profile/$userId', data: {
+          'first_name': firstName,
+          'last_name': lastName,
+          'phone_number': phone,
+        });
+      }
+      await ApiClient.updateCurrentUser({
+        'name': nameController.text.trim(),
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone_number': phone,
+        'phone': phone,
+      });
+      await ApiClient.fetchCurrentUser();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(context.l10n.profileSaved),
+          backgroundColor: AppColors.primary,
         ),
-      ),
-    );
-
-    Navigator.pop(context);
+      );
+      Navigator.pop(context);
+    } catch (_) {
+      await ApiClient.updateCurrentUser({
+        'name': nameController.text.trim(),
+        'first_name': firstName,
+        'last_name': lastName,
+        'phone_number': phone,
+        'phone': phone,
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(context.l10n.profileSaved),
+            backgroundColor: AppColors.primary,
+          ),
+        );
+        Navigator.pop(context);
+      }
+    } finally {
+      if (mounted) setState(() => isLoading = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor:
-          const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       appBar: AppBar(
-        title: const Text(
-          "Modifier le profil",
+        title: Text(
+          context.l10n.editProfile,
         ),
       ),
 
@@ -102,7 +150,7 @@ class _EditProfilePageState
                             AppColors.primary,
                         shape: BoxShape.circle,
                         border: Border.all(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           width: 3,
                         ),
                       ),
@@ -132,112 +180,71 @@ class _EditProfilePageState
                 ),
 
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius:
                       BorderRadius.circular(
                     24,
+                  ),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
                   ),
                 ),
 
                 child: Column(
                   children: [
                     TextFormField(
-                      controller:
-                          nameController,
-
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            "Nom complet",
-                        prefixIcon:
-                            Icon(Icons.person),
+                      controller: nameController,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.fullName,
+                        prefixIcon: const Icon(Icons.person),
                       ),
-
                       validator: (value) {
-                        if (value == null ||
-                            value.isEmpty) {
-                          return "Champ obligatoire";
+                        if (value == null || value.isEmpty) {
+                          return context.l10n.emptyCredentials;
                         }
-
                         return null;
                       },
                     ),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
 
                     TextFormField(
-                      controller:
-                          emailController,
-
-                      keyboardType:
-                          TextInputType
-                              .emailAddress,
-
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            "Adresse e-mail",
-                        prefixIcon:
-                            Icon(Icons.email),
+                      controller: emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.officialEmail,
+                        prefixIcon: const Icon(Icons.email),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
 
                     TextFormField(
-                      controller:
-                          phoneController,
-
-                      keyboardType:
-                          TextInputType.phone,
-
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            "Téléphone",
-                        prefixIcon:
-                            Icon(Icons.phone),
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.phone,
+                        prefixIcon: const Icon(Icons.phone),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
 
                     TextFormField(
-                      controller:
-                          functionController,
-
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            "Fonction",
-                        prefixIcon:
-                            Icon(Icons.badge),
+                      controller: functionController,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.jobFunction,
+                        prefixIcon: const Icon(Icons.badge),
                       ),
                     ),
 
-                    const SizedBox(
-                      height: 16,
-                    ),
+                    const SizedBox(height: 16),
 
                     TextFormField(
-                      controller:
-                          departmentController,
-
-                      decoration:
-                          const InputDecoration(
-                        labelText:
-                            "Département",
-                        prefixIcon:
-                            Icon(
-                          Icons
-                              .business_center_outlined,
-                        ),
+                      controller: departmentController,
+                      decoration: InputDecoration(
+                        labelText: context.l10n.department,
+                        prefixIcon: const Icon(Icons.business_center_outlined),
                       ),
                     ),
                   ],
@@ -249,19 +256,21 @@ class _EditProfilePageState
               SizedBox(
                 width: double.infinity,
                 height: 52,
-
                 child: ElevatedButton(
-                  onPressed: saveProfile,
-
-                  style:
-                      ElevatedButton.styleFrom(
-                    backgroundColor:
-                        AppColors.primary,
+                  onPressed: isLoading ? null : saveProfile,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
                   ),
-
-                  child: const Text(
-                    "Enregistrer",
-                  ),
+                  child: isLoading
+                      ? const SizedBox(
+                          width: 22,
+                          height: 22,
+                          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                        )
+                      : Text(
+                          context.l10n.save,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
                 ),
               ),
 
@@ -270,13 +279,12 @@ class _EditProfilePageState
               SizedBox(
                 width: double.infinity,
                 height: 52,
-
                 child: OutlinedButton(
                   onPressed: () {
                     Navigator.pop(context);
                   },
-                  child: const Text(
-                    "Annuler",
+                  child: Text(
+                    context.l10n.cancel,
                   ),
                 ),
               ),

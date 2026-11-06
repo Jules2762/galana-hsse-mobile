@@ -12,4 +12,15 @@ class AppCardTheme {
         ),
         shadowColor: Colors.black.withValues(alpha: 0.04),
       );
+
+  static CardThemeData get darkTheme => CardThemeData(
+        color: AppColors.darkSurface,
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: const BorderSide(color: AppColors.darkBorder, width: 1),
+        ),
+        shadowColor: Colors.black.withValues(alpha: 0.2),
+      );
 }

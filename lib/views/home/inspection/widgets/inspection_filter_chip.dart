@@ -15,31 +15,29 @@ class InspectionFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       borderRadius: BorderRadius.circular(50),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-
         padding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 10,
         ),
-
         decoration: BoxDecoration(
-          color:
-              selected ? AppColors.primary : Colors.white,
-
+          color: selected
+              ? AppColors.primary
+              : (isDark ? const Color(0xFF1E293B) : Colors.white),
           borderRadius: BorderRadius.circular(50),
-
           border: Border.all(
             color: selected
                 ? AppColors.primary
-                : const Color(0xFFD9DEE5),
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFD9DEE5)),
             width: 1,
           ),
         ),
-
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -49,10 +47,8 @@ class InspectionFilterChip extends StatelessWidget {
                 size: 16,
                 color: Colors.white,
               ),
-
               const SizedBox(width: 6),
             ],
-
             Text(
               label,
               style: TextStyle(
@@ -60,7 +56,7 @@ class InspectionFilterChip extends StatelessWidget {
                 fontWeight: FontWeight.w600,
                 color: selected
                     ? Colors.white
-                    : AppColors.textPrimary,
+                    : (isDark ? const Color(0xFFCBD5E1) : AppColors.textPrimary),
               ),
             ),
           ],

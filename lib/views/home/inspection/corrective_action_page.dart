@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/cores/services/personnel_service.dart';
@@ -12,12 +13,9 @@ class CorrectiveActionPage extends StatefulWidget {
 }
 
 class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
-  final descriptionController = TextEditingController(
-    text:
-        "Remplacer le boîtier de verrouillage endommagé et apposer une signalétique haute tension conforme aux normes NF.",
-  );
+  final descriptionController = TextEditingController();
 
-  String assignee = "ARIMANANA Maherison Jules (Inspecteur HSSE)";
+  String assignee = ApiClient.currentUser?['name']?.toString() ?? "Inspecteur HSSE";
 
   @override
   void dispose() {
@@ -27,8 +25,9 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
 
       appBar: InspectionAppBar(title: "Nouvelle action corrective"),
 // floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
@@ -104,9 +103,9 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
                         padding: const EdgeInsets.all(12),
 
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: isDark ? const Color(0xFF1E293B) : Colors.white,
                           borderRadius: BorderRadius.circular(14),
-                          border: Border.all(color: AppColors.border),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
                         ),
 
                         child: Row(
@@ -179,9 +178,9 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF8FAFC),
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFF8FAFC),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.border),
+                            border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
                           ),
                           child: Row(
                             children: [
@@ -198,8 +197,8 @@ class _CorrectiveActionPageState extends State<CorrectiveActionPage> {
                                         ? FontWeight.w600
                                         : FontWeight.normal,
                                     color: assignee.isNotEmpty
-                                        ? AppColors.textPrimary
-                                        : AppColors.textSecondary,
+                                        ? (isDark ? Colors.white : AppColors.textPrimary)
+                                        : (isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary),
                                   ),
                                 ),
                               ),

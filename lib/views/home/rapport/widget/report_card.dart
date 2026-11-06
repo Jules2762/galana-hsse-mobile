@@ -42,6 +42,8 @@ class ReportCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       onTap: onTap ??
           () {
@@ -55,7 +57,7 @@ class ReportCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
@@ -65,7 +67,7 @@ class ReportCard extends StatelessWidget {
             ),
           ],
           border: Border.all(
-            color: const Color(0xFFE2E8F0),
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
             width: 1,
           ),
         ),
@@ -94,15 +96,15 @@ class ReportCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Text(
                     report.reference,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
-                      color: Color(0xFF64748B),
+                      color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
                     ),
                   ),
                 ),
@@ -110,13 +112,17 @@ class ReportCard extends StatelessWidget {
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.calendar_today_outlined, size: 12, color: Color(0xFF94A3B8)),
+                    Icon(
+                      Icons.calendar_today_outlined,
+                      size: 12,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       report.date,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF94A3B8),
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF94A3B8),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -132,10 +138,10 @@ class ReportCard extends StatelessWidget {
               report.title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A),
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 height: 1.3,
               ),
             ),
@@ -145,16 +151,20 @@ class ReportCard extends StatelessWidget {
             // Site & Inspector Row
             Row(
               children: [
-                const Icon(Icons.location_on_outlined, size: 14, color: Color(0xFF64748B)),
+                Icon(
+                  Icons.location_on_outlined,
+                  size: 14,
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                ),
                 const SizedBox(width: 4),
                 Expanded(
                   child: Text(
                     report.site,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
-                      color: Color(0xFF64748B),
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -178,9 +188,9 @@ class ReportCard extends StatelessWidget {
                     const SizedBox(width: 4),
                     Text(
                       report.inspector,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
-                        color: Color(0xFF64748B),
+                        color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                       ),
                     ),
                   ],
@@ -232,9 +242,13 @@ class ReportCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFFEF2F2),
+                      color: isDark
+                          ? const Color(0xFF7F1D1D).withValues(alpha: 0.4)
+                          : const Color(0xFFFEF2F2),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFFECACA)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF991B1B) : const Color(0xFFFECACA),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -243,10 +257,10 @@ class ReportCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           "${report.nonConformities.length} écart${report.nonConformities.length > 1 ? 's' : ''}",
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFFDC2626),
+                            color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFDC2626),
                           ),
                         ),
                       ],
@@ -256,21 +270,25 @@ class ReportCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFF0FDF4),
+                      color: isDark
+                          ? const Color(0xFF064E2A).withValues(alpha: 0.4)
+                          : const Color(0xFFF0FDF4),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: const Color(0xFFBBF7D0)),
+                      border: Border.all(
+                        color: isDark ? const Color(0xFF16A34A) : const Color(0xFFBBF7D0),
+                      ),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF16A34A)),
-                        SizedBox(width: 4),
+                        const Icon(Icons.check_circle_outline, size: 13, color: Color(0xFF16A34A)),
+                        const SizedBox(width: 4),
                         Text(
                           "0 écart",
                           style: TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w600,
-                            color: Color(0xFF16A34A),
+                            color: isDark ? const Color(0xFF86EFAC) : const Color(0xFF16A34A),
                           ),
                         ),
                       ],

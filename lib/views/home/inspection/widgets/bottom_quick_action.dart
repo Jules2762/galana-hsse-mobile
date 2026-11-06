@@ -22,6 +22,7 @@ class BottomQuickAction extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.fromLTRB(
         16,
@@ -30,11 +31,11 @@ class BottomQuickAction extends StatelessWidget {
         24,
       ),
 
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         border: Border(
           top: BorderSide(
-            color: Color(0xFFE2E8F0),
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
           ),
         ),
       ),

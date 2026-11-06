@@ -37,7 +37,7 @@ class _InspectionAppBarState
             await showModalBottomSheet<String>(
               context: context,
               isScrollControlled: true,
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               shape:
                   const RoundedRectangleBorder(
                 borderRadius:
@@ -59,7 +59,7 @@ class _InspectionAppBarState
             await showModalBottomSheet(
               context: context,
               isScrollControlled: true,
-              backgroundColor: Colors.white,
+              backgroundColor: Theme.of(context).colorScheme.surface,
               shape:
                   const RoundedRectangleBorder(
                 borderRadius:

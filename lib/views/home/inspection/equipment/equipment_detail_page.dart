@@ -1,9 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:gestion_hsse/cores/services/camera_service.dart';
-import 'package:gestion_hsse/cores/services/equipment_service.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:gestion_hsse/cores/models/inspection_map_item.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
+import 'package:gestion_hsse/cores/services/camera_service.dart';
+import 'package:gestion_hsse/cores/services/equipment_service.dart';
+import 'package:gestion_hsse/cores/services/offline_storage_service.dart';
+import 'package:gestion_hsse/cores/services/personnel_service.dart';
+import 'package:gestion_hsse/cores/services/sync_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
 
@@ -33,6 +37,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
     if (widget.monitoring != null) {
       _monitoring = widget.monitoring!;
       _initialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshMonitoring());
     } else if (widget.equipment != null) {
       final e = widget.equipment!;
       _monitoring = EquipmentMonitoringData(
@@ -45,6 +50,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
         items: [e],
       );
       _initialized = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _refreshMonitoring());
     }
   }
 
@@ -58,6 +64,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
           _monitoring = args;
           _initialized = true;
         });
+        _refreshMonitoring();
       } else if (args is EquipmentItemData) {
         setState(() {
           _monitoring = EquipmentMonitoringData(
@@ -71,16 +78,24 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
           );
           _initialized = true;
         });
+        _refreshMonitoring();
+      } else if (args is Map) {
+        final parsed = EquipmentMonitoringData.fromJson(Map<String, dynamic>.from(args));
+        setState(() {
+          _monitoring = parsed;
+          _initialized = true;
+        });
+        _refreshMonitoring();
       } else {
-        // Fallback par défaut
+        // Fallback vide si aucun argument
         setState(() {
           _monitoring = const EquipmentMonitoringData(
             id: 1,
-            reference: "#EQ-1",
-            siteName: "Station Majunga",
-            date: "16 Oct 2026",
+            reference: "",
+            siteName: "Site non spécifié",
+            date: "",
             status: "En cours",
-            inspector: "Jules Rakoto",
+            inspector: "Inspecteur HSSE",
             items: [],
           );
           _initialized = true;
@@ -99,7 +114,8 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
   }
 
   List<EquipmentItemData> get _filteredItems {
-    return _monitoring.items.where((it) {
+    final dedup = OfflineStorageService.deduplicateItems(_monitoring.items);
+    return dedup.where((it) {
       if (_selectedFilter == 'Conformes' && !it.conformity) return false;
       if (_selectedFilter == 'Anomalies' && it.conformity) return false;
       if (_selectedCategory != null && _selectedCategory != 'Tous') {
@@ -145,7 +161,11 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
   }
 
   void _changeStatus(String newStatus) async {
-    final updated = await EquipmentService.updateMonitoringStatus(_monitoring.id, newStatus);
+    final updated = await EquipmentService.updateMonitoringStatus(
+      _monitoring.id,
+      newStatus,
+      currentItems: _monitoring.items,
+    );
     if (updated != null && mounted) {
       setState(() {
         _monitoring = updated;
@@ -162,15 +182,273 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
 
   void _toggleItemConformity(EquipmentItemData item) async {
     final newConformity = !item.conformity;
+    if (!newConformity) {
+      await _showCorrectiveActionDialogForItem(item);
+    } else {
+      final updatedItem = await EquipmentService.updateItemConformity(
+        _monitoring.id,
+        item.copyWith(action: null),
+        true,
+      );
+      _replaceItemInState(updatedItem);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("${item.designation} marqué Conforme ✓"),
+          backgroundColor: const Color(0xFF15803D),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showCorrectiveActionDialogForItem(EquipmentItemData item) async {
+    final existingAction = item.action;
+    final descCtrl = TextEditingController(
+      text: existingAction?['description']?.toString() ??
+          (item.comment?.isNotEmpty == true
+              ? item.comment!
+              : "Corriger l'écart constaté sur : ${item.designation}"),
+    );
+    String assignee = existingAction?['assignee']?.toString() ??
+        (ApiClient.currentUser?['name']?.toString() ?? "Inspecteur HSSE");
+
+    final res = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final isDark = Theme.of(ctx).brightness == Brightness.dark;
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.3) : const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        color: Color(0xFFDC2626), size: 22),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Action Corrective",
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isDark ? Colors.white : AppColors.textPrimary,
+                          ),
+                        ),
+                        Text(
+                          "${item.designation} (${item.type})",
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "Description du plan d'action *",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    TextField(
+                      controller: descCtrl,
+                      maxLines: 3,
+                      style: TextStyle(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                      decoration: InputDecoration(
+                        hintText: "Préciser l'action corrective à mener...",
+                        hintStyle: TextStyle(fontSize: 12, color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400),
+                        filled: true,
+                        fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : AppColors.border),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : AppColors.border),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                    Text(
+                      "Responsable / Personnel assigné *",
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    InkWell(
+                      onTap: () async {
+                        final picked = await PersonnelService.showPersonnelPicker(
+                          ctx,
+                          currentName: assignee,
+                        );
+                        if (picked != null) {
+                          setDialogState(() {
+                            assignee = "${picked.fullName} (${picked.fonction})";
+                          });
+                        }
+                      },
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                        decoration: BoxDecoration(
+                          color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF1E3A8A).withValues(alpha: 0.3) : const Color(0xFFEFF6FF),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Icon(Icons.person, size: 16, color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                assignee.isNotEmpty
+                                    ? assignee
+                                    : "Sélectionner un responsable du personnel...",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: assignee.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                  color: assignee.isNotEmpty
+                                      ? (isDark ? Colors.white : AppColors.textPrimary)
+                                      : (isDark ? const Color(0xFF64748B) : AppColors.textSecondary),
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            Icon(Icons.keyboard_arrow_down, size: 20, color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, false),
+                  child: const Text("Ignorer"),
+                ),
+                ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFDC2626),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                  icon: const Icon(Icons.check, size: 18),
+                  label: const Text("Enregistrer l'action"),
+                  onPressed: () {
+                    if (descCtrl.text.trim().isEmpty) return;
+                    Navigator.pop(ctx, true);
+                  },
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    final actionMap = res == true
+        ? {
+            'description': descCtrl.text.trim(),
+            'assignee': assignee,
+            'createdAt': DateTime.now().toIso8601String(),
+          }
+        : item.action;
+
     final updatedItem = await EquipmentService.updateItemConformity(
       _monitoring.id,
       item,
-      newConformity,
+      false,
+      comment: descCtrl.text.trim(),
+      action: actionMap,
     );
 
+    _replaceItemInState(updatedItem);
+
+    if (res == true) {
+      final actId = 'equipment_action_${item.id ?? DateTime.now().millisecondsSinceEpoch}';
+      SyncService.instance.queueAction(
+        SyncAction(
+          id: actId,
+          type: 'EQUIPMENT_ACTION_CREATE',
+          title: 'Action: ${descCtrl.text.trim()}',
+          endpoint: '/home/actions/equipment',
+          method: 'POST',
+          payload: {
+            'equipment_item_id': item.id,
+            'description': descCtrl.text.trim(),
+            'person_in_charge': assignee,
+            'status': 'PENDING',
+          },
+          createdAt: DateTime.now(),
+        ),
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: const Color(0xFF16A34A),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text("Action corrective enregistrée pour ${item.designation}"),
+                ),
+              ],
+            ),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    }
+  }
+
+  void _replaceItemInState(EquipmentItemData updatedItem) {
     final updatedItems = List<EquipmentItemData>.from(_monitoring.items);
     final idx = updatedItems.indexWhere((i) =>
-        (item.id != null && i.id != null && i.id == item.id) || i.tagNumber == item.tagNumber);
+        (updatedItem.id != null && i.id != null && i.id == updatedItem.id) ||
+        i.tagNumber == updatedItem.tagNumber);
     if (idx != -1) {
       updatedItems[idx] = updatedItem;
     }
@@ -185,15 +463,6 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
         conformityRate: newRate,
       );
     });
-
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("${item.designation} marqué ${newConformity ? 'Conforme ✓' : 'Non-conforme ⚠'}"),
-        backgroundColor: newConformity ? const Color(0xFF15803D) : const Color(0xFFB91C1C),
-        duration: const Duration(seconds: 1),
-      ),
-    );
   }
 
   void _deleteItem(EquipmentItemData item) async {
@@ -376,23 +645,14 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
     final nameController = TextEditingController();
     final locationController = TextEditingController(text: "Piste distribution");
     final commentController = TextEditingController();
-    String selectedType = "Extincteur P50";
+    final actionDescController = TextEditingController();
+    String assignee = ApiClient.currentUser?['name']?.toString() ?? "Inspecteur HSSE";
+
+    final categories = EquipmentService.standardCategories;
+    String selectedType = categories.first.label;
     bool isConforme = true;
     final List<String> localPhotos = [];
-
-    final types = const [
-      "Extincteur P50",
-      "Extincteur P9",
-      "Extincteur P6",
-      "Extincteur CO2",
-      "RIA",
-      "Cuves & Bacs",
-      "Matériel & Outils",
-      "Déchets & Poubelles",
-      "Sécurité Incendie",
-      "Signalétique",
-      "Autre / Divers",
-    ];
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     showModalBottomSheet(
       context: context,
@@ -411,9 +671,9 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                 top: 20,
                 bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
               ),
-              decoration: const BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: SafeArea(
                 child: SingleChildScrollView(
@@ -426,7 +686,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                           width: 40,
                           height: 4,
                           decoration: BoxDecoration(
-                            color: Colors.grey.shade300,
+                            color: isDark ? const Color(0xFF475569) : Colors.grey.shade300,
                             borderRadius: BorderRadius.circular(10),
                           ),
                         ),
@@ -439,14 +699,14 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                           Container(
                             padding: const EdgeInsets.all(10),
                             decoration: BoxDecoration(
-                              color: AppColors.primaryLight,
+                              color: isDark ? const Color(0xFF0F9D58).withValues(alpha: 0.2) : AppColors.primaryLight,
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: const Icon(Icons.add_moderator_rounded,
                                 color: AppColors.primary, size: 24),
                           ),
                           const SizedBox(width: 12),
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -455,14 +715,14 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                   style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 16,
-                                    color: AppColors.textPrimary,
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                                 Text(
                                   "Contrôle unitaire sur le terrain (1 matériel = 1 unité)",
                                   style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.textSecondary,
+                                    color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
                                   ),
                                 ),
                               ],
@@ -472,26 +732,36 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                       ),
 
                       const SizedBox(height: 16),
-                      const Divider(height: 1),
+                      Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       const SizedBox(height: 16),
 
                       // 1. Nom / Désignation
-                      const Text(
+                      Text(
                         "Désignation du matériel *",
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: nameController,
+                        style: TextStyle(fontSize: 13, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: "Ex: Extincteur 50kg Poudre Îlot 1",
-                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
-                          prefixIcon: const Icon(Icons.build_circle_outlined, size: 20),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400, fontSize: 13),
+                          prefixIcon: Icon(Icons.build_circle_outlined, size: 20, color: isDark ? const Color(0xFF94A3B8) : null),
+                          filled: isDark,
+                          fillColor: isDark ? const Color(0xFF0F172A) : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         ),
                       ),
@@ -504,30 +774,37 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   "Type d'équipement *",
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10),
                                   decoration: BoxDecoration(
-                                    color: Colors.grey.shade50,
+                                    color: isDark ? const Color(0xFF0F172A) : Colors.grey.shade50,
                                     borderRadius: BorderRadius.circular(12),
-                                    border: Border.all(color: Colors.grey.shade300),
+                                    border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
                                   ),
                                   child: DropdownButtonHideUnderline(
                                     child: DropdownButton<String>(
                                       value: selectedType,
+                                      dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                                       isExpanded: true,
-                                      items: types.map((t) {
+                                      items: categories.map((c) {
                                         return DropdownMenuItem(
-                                          value: t,
-                                          child: Text(t, style: const TextStyle(fontSize: 12)),
+                                          value: c.label,
+                                          child: Text(
+                                            c.label,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: isDark ? Colors.white : const Color(0xFF0F172A),
+                                            ),
+                                          ),
                                         );
                                       }).toList(),
                                       onChanged: (val) {
@@ -544,21 +821,31 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                const Text(
+                                Text(
                                   "Emplacement *",
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
-                                    color: AppColors.textPrimary,
+                                    color: isDark ? Colors.white : AppColors.textPrimary,
                                   ),
                                 ),
                                 const SizedBox(height: 6),
                                 TextField(
                                   controller: locationController,
+                                  style: TextStyle(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                                   decoration: InputDecoration(
                                     hintText: "Ex: Piste, Boutique...",
-                                    hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                                    hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400, fontSize: 12),
+                                    filled: isDark,
+                                    fillColor: isDark ? const Color(0xFF0F172A) : null,
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                    ),
+                                    enabledBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                      borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                                    ),
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                                   ),
                                 ),
@@ -570,12 +857,12 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                       const SizedBox(height: 16),
 
                       // 3. Conformité
-                      const Text(
+                      Text(
                         "Conformité constatée *",
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -587,10 +874,12 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: isConforme ? const Color(0xFFDCFCE7) : Colors.grey.shade100,
+                                  color: isConforme
+                                      ? (isDark ? const Color(0xFF16A34A).withValues(alpha: 0.25) : const Color(0xFFDCFCE7))
+                                      : (isDark ? const Color(0xFF0F172A) : Colors.grey.shade100),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: isConforme ? const Color(0xFF16A34A) : Colors.grey.shade300,
+                                    color: isConforme ? const Color(0xFF16A34A) : (isDark ? const Color(0xFF334155) : Colors.grey.shade300),
                                     width: isConforme ? 2 : 1,
                                   ),
                                 ),
@@ -624,10 +913,12 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                               child: Container(
                                 padding: const EdgeInsets.symmetric(vertical: 12),
                                 decoration: BoxDecoration(
-                                  color: !isConforme ? const Color(0xFFFEE2E2) : Colors.grey.shade100,
+                                  color: !isConforme
+                                      ? (isDark ? const Color(0xFFDC2626).withValues(alpha: 0.25) : const Color(0xFFFEE2E2))
+                                      : (isDark ? const Color(0xFF0F172A) : Colors.grey.shade100),
                                   borderRadius: BorderRadius.circular(12),
                                   border: Border.all(
-                                    color: !isConforme ? const Color(0xFFDC2626) : Colors.grey.shade300,
+                                    color: !isConforme ? const Color(0xFFDC2626) : (isDark ? const Color(0xFF334155) : Colors.grey.shade300),
                                     width: !isConforme ? 2 : 1,
                                   ),
                                 ),
@@ -637,7 +928,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                   children: [
                                     Icon(
                                       Icons.warning_amber_rounded,
-                                      color: !isConforme ? const Color(0xFFB91C1C) : Colors.grey.shade500,
+                                      color: !isConforme ? const Color(0xFFEF4444) : Colors.grey.shade500,
                                       size: 18,
                                     ),
                                     const SizedBox(width: 6),
@@ -646,7 +937,7 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 13,
-                                        color: !isConforme ? const Color(0xFFB91C1C) : Colors.grey.shade700,
+                                        color: !isConforme ? const Color(0xFFEF4444) : (isDark ? const Color(0xFF94A3B8) : Colors.grey.shade700),
                                       ),
                                     ),
                                   ],
@@ -656,25 +947,151 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                           ),
                         ],
                       ),
+
+                      // Section Action Corrective intégrée si Non-conforme
+                      if (!isConforme) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: isDark ? const Color(0xFF7F1D1D).withValues(alpha: 0.25) : const Color(0xFFFEF2F2),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: isDark ? const Color(0xFFDC2626).withValues(alpha: 0.4) : const Color(0xFFFCA5A5)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  const Icon(Icons.warning_amber_rounded, size: 16, color: Color(0xFFDC2626)),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    "Action corrective requise *",
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                      color: isDark ? const Color(0xFFFCA5A5) : const Color(0xFFB91C1C),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                "Plan d'action corrective *",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF374151),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              TextField(
+                                controller: actionDescController,
+                                maxLines: 2,
+                                style: TextStyle(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+                                decoration: InputDecoration(
+                                  hintText: "Décrire l'action corrective à entreprendre...",
+                                  hintStyle: TextStyle(fontSize: 11, color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400),
+                                  filled: true,
+                                  fillColor: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                  border: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
+                                  ),
+                                  enabledBorder: OutlineInputBorder(
+                                    borderRadius: BorderRadius.circular(10),
+                                    borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
+                                  ),
+                                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                ),
+                              ),
+                              const SizedBox(height: 10),
+                              Text(
+                                "Responsable assigné *",
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF374151),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              InkWell(
+                                onTap: () async {
+                                  final picked = await PersonnelService.showPersonnelPicker(
+                                    ctx,
+                                    currentName: assignee,
+                                  );
+                                  if (picked != null) {
+                                    setModalState(() {
+                                      assignee = "${picked.fullName} (${picked.fonction})";
+                                    });
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(10),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: Border.all(color: isDark ? const Color(0xFF334155) : Colors.grey.shade300),
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      const Icon(Icons.person, size: 16, color: Color(0xFF1D4ED8)),
+                                      const SizedBox(width: 8),
+                                      Expanded(
+                                        child: Text(
+                                          assignee.isNotEmpty ? assignee : "Sélectionner un responsable...",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: assignee.isNotEmpty ? FontWeight.w600 : FontWeight.normal,
+                                            color: assignee.isNotEmpty
+                                                ? (isDark ? Colors.white : AppColors.textPrimary)
+                                                : (isDark ? const Color(0xFF64748B) : AppColors.textSecondary),
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Icon(Icons.keyboard_arrow_down, size: 18, color: isDark ? const Color(0xFF64748B) : AppColors.textSecondary),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+
                       const SizedBox(height: 14),
 
                       // 4. Observation
-                      const Text(
-                        "Observations / Anomalies",
+                      Text(
+                        "Observations / Remarques",
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: isDark ? Colors.white : AppColors.textPrimary,
                         ),
                       ),
                       const SizedBox(height: 6),
                       TextField(
                         controller: commentController,
                         maxLines: 2,
+                        style: TextStyle(fontSize: 12, color: isDark ? Colors.white : const Color(0xFF0F172A)),
                         decoration: InputDecoration(
                           hintText: "Ex: Pression OK, goupille vérifiée...",
-                          hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 12),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                          hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400, fontSize: 12),
+                          filled: isDark,
+                          fillColor: isDark ? const Color(0xFF0F172A) : null,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
+                          ),
                           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                         ),
                       ),
@@ -684,12 +1101,12 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text(
+                          Text(
                             "Photos justificatives",
                             style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
+                              color: isDark ? Colors.white : AppColors.textPrimary,
                             ),
                           ),
                           TextButton.icon(
@@ -758,16 +1175,33 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                 ? nameController.text.trim()
                                 : selectedType;
 
+                            Map<String, dynamic>? actionMap;
+                            if (!isConforme) {
+                              final actDesc = actionDescController.text.trim().isNotEmpty
+                                  ? actionDescController.text.trim()
+                                  : "Corriger l'écart constaté sur : $name";
+                              actionMap = {
+                                'description': actDesc,
+                                'assignee': assignee,
+                                'createdAt': DateTime.now().toIso8601String(),
+                              };
+                            }
+
+                            final finalComment = (!isConforme && actionMap != null)
+                                ? actionMap['description']
+                                : (commentController.text.trim().isNotEmpty
+                                    ? commentController.text.trim()
+                                    : null);
+
                             final newItem = await EquipmentService.addItemToMonitoring(
                               _monitoring.id,
                               name: name,
                               type: selectedType,
                               isConforme: isConforme,
                               location: locationController.text.trim(),
-                              comment: commentController.text.trim().isNotEmpty
-                                  ? commentController.text.trim()
-                                  : null,
+                              comment: finalComment,
                               photoPaths: localPhotos,
+                              action: actionMap,
                             );
 
                             final updatedItems = List<EquipmentItemData>.from(_monitoring.items);
@@ -789,6 +1223,26 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
                                 rawStatus: nextRawStatus,
                               );
                             });
+
+                            if (actionMap != null) {
+                              final actId = 'equipment_action_${newItem.id ?? DateTime.now().millisecondsSinceEpoch}';
+                              SyncService.instance.queueAction(
+                                SyncAction(
+                                  id: actId,
+                                  type: 'EQUIPMENT_ACTION_CREATE',
+                                  title: 'Action: ${actionMap['description']}',
+                                  endpoint: '/home/actions/equipment',
+                                  method: 'POST',
+                                  payload: {
+                                    'equipment_item_id': newItem.id,
+                                    'description': actionMap['description'],
+                                    'person_in_charge': actionMap['assignee'],
+                                    'status': 'PENDING',
+                                  },
+                                  createdAt: DateTime.now(),
+                                ),
+                              );
+                            }
 
                             if (ctx.mounted) Navigator.pop(ctx);
                           },
@@ -840,15 +1294,16 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final int total = _monitoring.totalEquipments;
-    final int conformes = _monitoring.conformeCount;
-    final int anomalies = _monitoring.anomalyCount;
-    final double rate = _monitoring.calculatedRate;
+    final dedupItems = OfflineStorageService.deduplicateItems(_monitoring.items);
+    final int total = dedupItems.length;
+    final int conformes = dedupItems.where((it) => it.conformity).length;
+    final int anomalies = dedupItems.where((it) => !it.conformity).length;
+    final double rate = total > 0 ? (conformes / total) * 100.0 : 100.0;
     final items = _filteredItems;
     final categoryCounts = _monitoring.categoryCounts;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1496,6 +1951,60 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
             ),
           ],
 
+          // Bannière Action Corrective si Non-conforme
+          if (!item.conformity) ...[
+            const SizedBox(height: 8),
+            InkWell(
+              onTap: () => _showCorrectiveActionDialogForItem(item),
+              borderRadius: BorderRadius.circular(10),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFEF2F2),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFCA5A5)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.assignment_late_outlined, size: 16, color: Color(0xFFDC2626)),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.action != null
+                                ? "Action : ${item.action!['description'] ?? 'Planifiée'}"
+                                : "Action corrective requise (Cliquer pour définir)",
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF991B1B),
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (item.action?['assignee'] != null)
+                            Text(
+                              "Responsable : ${item.action!['assignee']}",
+                              style: const TextStyle(fontSize: 10, color: Color(0xFFB91C1C)),
+                            ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    Icon(
+                      item.action != null ? Icons.edit_outlined : Icons.add_circle_outline,
+                      size: 16,
+                      color: const Color(0xFFDC2626),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
           // Galerie Photos
           if (item.attachments.isNotEmpty) ...[
             const SizedBox(height: 8),
@@ -1525,10 +2034,26 @@ class _EquipmentDetailPageState extends State<EquipmentDetailPage> {
           const Divider(height: 1, color: Color(0xFFF1F5F9)),
           const SizedBox(height: 6),
 
-          // Actions du matériel (+ Photo, Supprimer)
+          // Actions du matériel (+ Action, + Photo, Supprimer)
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
+              if (!item.conformity) ...[
+                TextButton.icon(
+                  onPressed: () => _showCorrectiveActionDialogForItem(item),
+                  icon: const Icon(Icons.assignment_turned_in_outlined, size: 14, color: Color(0xFFDC2626)),
+                  label: Text(
+                    item.action != null ? "Action" : "+ Action",
+                    style: const TextStyle(fontSize: 11, color: Color(0xFFDC2626), fontWeight: FontWeight.bold),
+                  ),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               TextButton.icon(
                 onPressed: () => _addItemPhoto(item),
                 icon: const Icon(Icons.add_a_photo_outlined, size: 14),

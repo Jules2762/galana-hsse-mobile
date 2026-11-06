@@ -100,15 +100,18 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final values = _getMetricValues();
     final avg = _currentAverage;
     final total = _currentTotal;
 
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.03),
@@ -144,13 +147,13 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                   const SizedBox(width: 10),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         "Performance HSSE",
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                           letterSpacing: -0.3,
                         ),
                       ),
@@ -159,7 +162,7 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: Color(0xFF64748B),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -170,19 +173,26 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF475569) : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 child: DropdownButtonHideUnderline(
                   child: DropdownButton<ChartPeriod>(
                     value: _selectedPeriod,
                     isDense: true,
-                    icon: const Icon(Icons.keyboard_arrow_down, size: 18, color: Color(0xFF475569)),
-                    style: const TextStyle(
+                    dropdownColor: isDark ? const Color(0xFF1E293B) : Colors.white,
+                    icon: Icon(
+                      Icons.keyboard_arrow_down,
+                      size: 18,
+                      color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                    ),
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E293B),
+                      color: isDark ? Colors.white : const Color(0xFF1E293B),
                     ),
                     onChanged: (val) {
                       if (val != null) setState(() => _selectedPeriod = val);
@@ -211,7 +221,7 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
           Container(
             padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
@@ -220,16 +230,19 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                   label: "Conformité",
                   metric: ChartMetricType.conformity,
                   icon: Icons.verified_rounded,
+                  isDark: isDark,
                 ),
                 _buildMetricTab(
                   label: "Audits & VMC",
                   metric: ChartMetricType.inspections,
                   icon: Icons.assignment_turned_in_rounded,
+                  isDark: isDark,
                 ),
                 _buildMetricTab(
                   label: "Équipements",
                   metric: ChartMetricType.equipments,
                   icon: Icons.fire_extinguisher_rounded,
+                  isDark: isDark,
                 ),
               ],
             ),
@@ -252,10 +265,10 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                         : _selectedMetric == ChartMetricType.inspections
                             ? "${total.toInt()} audits"
                             : "${total.toInt()} vérifiés",
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 26,
                       fontWeight: FontWeight.w900,
-                      color: Color(0xFF0F172A),
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -304,10 +317,16 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: avg >= 90 ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB),
+                    color: isDark
+                        ? (avg >= 90
+                            ? const Color(0xFF064E2A).withValues(alpha: 0.5)
+                            : const Color(0xFF78350F).withValues(alpha: 0.5))
+                        : (avg >= 90 ? const Color(0xFFF0FDF4) : const Color(0xFFFFFBEB)),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: avg >= 90 ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A),
+                      color: isDark
+                          ? (avg >= 90 ? const Color(0xFF16A34A) : const Color(0xFFD97706))
+                          : (avg >= 90 ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A)),
                     ),
                   ),
                   child: Row(
@@ -324,7 +343,9 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color: avg >= 90 ? const Color(0xFF15803D) : const Color(0xFFB45309),
+                          color: isDark
+                              ? (avg >= 90 ? const Color(0xFF86EFAC) : const Color(0xFFFDE68A))
+                              : (avg >= 90 ? const Color(0xFF15803D) : const Color(0xFFB45309)),
                         ),
                       ),
                     ],
@@ -447,7 +468,7 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                   horizontalInterval: _selectedMetric == ChartMetricType.conformity ? 25 : _maxY / 4,
                   getDrawingHorizontalLine: (value) {
                     return FlLine(
-                      color: const Color(0xFFF1F5F9),
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                       strokeWidth: 1,
                     );
                   },
@@ -609,6 +630,7 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
     required String label,
     required ChartMetricType metric,
     required IconData icon,
+    bool isDark = false,
   }) {
     final isSelected = _selectedMetric == metric;
     return Expanded(
@@ -622,7 +644,9 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
         child: Container(
           padding: const EdgeInsets.symmetric(vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.transparent,
+            color: isSelected
+                ? (isDark ? const Color(0xFF1E293B) : Colors.white)
+                : Colors.transparent,
             borderRadius: BorderRadius.circular(9),
             boxShadow: isSelected
                 ? [
@@ -640,7 +664,9 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
               Icon(
                 icon,
                 size: 13,
-                color: isSelected ? const Color(0xFF0F9D58) : const Color(0xFF64748B),
+                color: isSelected
+                    ? const Color(0xFF0F9D58)
+                    : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
               ),
               const SizedBox(width: 5),
               Text(
@@ -648,7 +674,9 @@ class _PerformanceChartCardState extends State<PerformanceChartCard> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: isSelected ? FontWeight.w800 : FontWeight.w600,
-                  color: isSelected ? const Color(0xFF0F9D58) : const Color(0xFF64748B),
+                  color: isSelected
+                      ? const Color(0xFF0F9D58)
+                      : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                 ),
               ),
             ],

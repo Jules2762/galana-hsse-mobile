@@ -15,28 +15,25 @@ class ReportFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
-      borderRadius:
-          BorderRadius.circular(50),
+      borderRadius: BorderRadius.circular(50),
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(
+        padding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 8,
         ),
         decoration: BoxDecoration(
           color: selected
               ? AppColors.primary
-              : Colors.white,
-          borderRadius:
-              BorderRadius.circular(50),
+              : (isDark ? const Color(0xFF1E293B) : Colors.white),
+          borderRadius: BorderRadius.circular(50),
           border: Border.all(
             color: selected
                 ? AppColors.primary
-                : const Color(
-                    0xFFE2E8F0,
-                  ),
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           ),
         ),
         child: Text(
@@ -44,9 +41,8 @@ class ReportFilterChip extends StatelessWidget {
           style: TextStyle(
             color: selected
                 ? Colors.white
-                : AppColors.textPrimary,
-            fontWeight:
-                FontWeight.w600,
+                : (isDark ? const Color(0xFFCBD5E1) : AppColors.textPrimary),
+            fontWeight: FontWeight.w600,
           ),
         ),
       ),

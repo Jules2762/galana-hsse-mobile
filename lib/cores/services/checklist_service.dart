@@ -67,10 +67,28 @@ class ChecklistService {
                 : (m['inspector']?.toString() ?? 'Inspecteur Galana');
             final date = m['date']?.toString() ?? '14 Oct 2026';
             final statusStr = m['status']?.toString() ?? 'En cours';
-            double progress = 0.5;
-            if (statusStr.toLowerCase().contains('termin') || statusStr == 'COMPLETED') {
+            double progress = 0.0;
+            if (m['progress'] != null) {
+              progress = (m['progress'] as num).toDouble();
+            } else if (m['sections'] is List) {
+              int total = 0;
+              int answered = 0;
+              for (var sec in m['sections']) {
+                if (sec is Map && sec['items'] is List) {
+                  for (var it in sec['items']) {
+                    total++;
+                    if (it is Map && it['answer'] != null && it['answer'].toString().trim().isNotEmpty) {
+                      answered++;
+                    }
+                  }
+                }
+              }
+              progress = total > 0
+                  ? (answered / total)
+                  : (statusStr.toLowerCase().contains('termin') || statusStr == 'COMPLETED' ? 1.0 : 0.0);
+            } else if (statusStr.toLowerCase().contains('termin') || statusStr == 'COMPLETED') {
               progress = 1.0;
-            } else if (statusStr.toLowerCase().contains('planif')) {
+            } else if (statusStr.toLowerCase().contains('planif') || statusStr == 'DRAFT') {
               progress = 0.0;
             }
 
@@ -219,6 +237,7 @@ class ChecklistService {
         'site': item.site,
         'status': 'COMPLETED',
         'completed_at': DateTime.now().toIso8601String(),
+        'items': answers?['items'] ?? [],
         'answers': answers ?? {},
       },
       createdAt: DateTime.now(),

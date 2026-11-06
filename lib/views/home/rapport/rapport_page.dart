@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/models/report_model.dart';
 import 'package:gestion_hsse/cores/services/report_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
@@ -102,6 +103,8 @@ class _RapportPageState extends State<RapportPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return RefreshIndicator(
       onRefresh: _loadReports,
       color: AppColors.primary,
@@ -116,7 +119,7 @@ class _RapportPageState extends State<RapportPage> {
             // ============================================
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -129,6 +132,9 @@ class _RapportPageState extends State<RapportPage> {
               child: TextField(
                 controller: _searchController,
                 onChanged: (_) => _loadReports(),
+                style: TextStyle(
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
+                ),
                 decoration: InputDecoration(
                   hintText: "Rechercher par titre, site, inspecteur...",
                   hintStyle: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
@@ -143,15 +149,19 @@ class _RapportPageState extends State<RapportPage> {
                         )
                       : null,
                   filled: true,
-                  fillColor: Colors.white,
+                  fillColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                   contentPadding: const EdgeInsets.symmetric(vertical: 12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
-                    borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    borderSide: BorderSide(
+                      color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                    ),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(16),
@@ -170,31 +180,34 @@ class _RapportPageState extends State<RapportPage> {
               children: [
                 Expanded(
                   child: _buildKpiCard(
-                    title: "Rapports",
+                    title: context.l10n.reports,
                     value: _reports.length.toString(),
                     subtitle: "Disponibles",
                     icon: Icons.description_outlined,
                     color: const Color(0xFF0284C7),
+                    isDark: isDark,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildKpiCard(
-                    title: "Conformité",
+                    title: context.l10n.conform,
                     value: "$_averageConformity%",
                     subtitle: "Taux moyen",
                     icon: Icons.verified_outlined,
                     color: _averageConformity >= 80 ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                    isDark: isDark,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: _buildKpiCard(
-                    title: "Écarts",
+                    title: context.l10n.deviationsFound,
                     value: _totalNonConformities.toString(),
                     subtitle: "Non-conformités",
                     icon: Icons.warning_amber_rounded,
                     color: _totalNonConformities == 0 ? const Color(0xFF16A34A) : const Color(0xFFDC2626),
+                    isDark: isDark,
                   ),
                 ),
               ],
@@ -216,28 +229,30 @@ class _RapportPageState extends State<RapportPage> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
+                        color: isDark
+                            ? const Color(0xFF1E3A8A).withValues(alpha: 0.5)
+                            : const Color(0xFFEFF6FF),
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: const Color(0xFFBFDBFE),
+                          color: isDark ? const Color(0xFF2563EB) : const Color(0xFFBFDBFE),
                           width: 1.0,
                         ),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.person_pin,
                             size: 15,
-                            color: Color(0xFF1D4ED8),
+                            color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            "Mes assignations (${_reports.length})",
-                            style: const TextStyle(
+                            "${context.l10n.assignedToMe} (${_reports.length})",
+                            style: TextStyle(
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
-                              color: Color(0xFF1D4ED8),
+                              color: isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8),
                             ),
                           ),
                         ],
@@ -283,17 +298,21 @@ class _RapportPageState extends State<RapportPage> {
                           _loadReports();
                         },
                         selectedColor: AppColors.primary.withValues(alpha: 0.15),
-                        backgroundColor: Colors.white,
+                        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                         checkmarkColor: AppColors.primary,
                         labelStyle: TextStyle(
                           fontSize: 12,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? AppColors.primary : const Color(0xFF64748B),
+                          color: isSelected
+                              ? AppColors.primary
+                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B)),
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(20),
                           side: BorderSide(
-                            color: isSelected ? AppColors.primary : const Color(0xFFE2E8F0),
+                            color: isSelected
+                                ? AppColors.primary
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                           ),
                         ),
                       ),
@@ -324,11 +343,13 @@ class _RapportPageState extends State<RapportPage> {
                           _loadReports();
                         },
                         selectedColor: const Color(0xFF0F9D58),
-                        backgroundColor: const Color(0xFFF1F5F9),
+                        backgroundColor: isDark ? const Color(0xFF1E293B) : const Color(0xFFF1F5F9),
                         labelStyle: TextStyle(
                           fontSize: 11,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                          color: isSelected ? Colors.white : const Color(0xFF64748B),
+                          color: isSelected
+                              ? Colors.white
+                              : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
@@ -358,20 +379,22 @@ class _RapportPageState extends State<RapportPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: isDark ? const Color(0xFF1E293B) : Colors.white,
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(
+                    color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                  ),
                 ),
                 child: Column(
                   children: [
                     const Icon(Icons.description_outlined, size: 48, color: Color(0xFFCBD5E1)),
                     const SizedBox(height: 12),
-                    const Text(
+                    Text(
                       "Aucun rapport assigné",
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF334155),
+                        color: isDark ? Colors.white : const Color(0xFF334155),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -419,11 +442,12 @@ class _RapportPageState extends State<RapportPage> {
     required String subtitle,
     required IconData icon,
     required Color color,
+    bool isDark = false,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: isDark ? const Color(0xFF1E293B) : Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
@@ -432,7 +456,9 @@ class _RapportPageState extends State<RapportPage> {
             offset: const Offset(0, 2),
           ),
         ],
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(
+          color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,10 +468,10 @@ class _RapportPageState extends State<RapportPage> {
             children: [
               Text(
                 title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
-                  color: Color(0xFF64748B),
+                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
                 ),
               ),
               Icon(icon, size: 16, color: color),

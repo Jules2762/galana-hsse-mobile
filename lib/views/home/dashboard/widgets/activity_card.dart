@@ -20,11 +20,15 @@ class ActivityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Card(
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Colors.grey.shade200),
+        side: BorderSide(
+          color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+        ),
       ),
       margin: const EdgeInsets.only(bottom: 10),
       child: InkWell(
@@ -56,9 +60,10 @@ class ActivityCard extends StatelessWidget {
                       title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                       ),
                     ),
                     const SizedBox(height: 3),
@@ -68,7 +73,7 @@ class ActivityCard extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Colors.grey.shade600,
+                        color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade600,
                       ),
                     ),
                   ],
@@ -98,7 +103,7 @@ class ActivityCard extends StatelessWidget {
                 Icon(
                   Icons.chevron_right,
                   size: 18,
-                  color: Colors.grey.shade400,
+                  color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400,
                 ),
               ],
             ],

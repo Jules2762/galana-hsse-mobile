@@ -20,14 +20,21 @@ class NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Container(
       padding: const EdgeInsets.all(16),
-
       decoration: BoxDecoration(
-        color: unread ? const Color(0xFFF0FDF4) : Colors.white,
+        color: unread
+            ? (isDark
+                ? const Color(0xFF064E2A).withValues(alpha: 0.3)
+                : const Color(0xFFF0FDF4))
+            : (isDark ? const Color(0xFF1E293B) : Colors.white),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: unread ? const Color(0xFF86EFAC) : const Color(0xFFE2E8F0),
+          color: unread
+              ? (isDark ? const Color(0xFF15803D) : const Color(0xFF86EFAC))
+              : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           width: unread ? 1.2 : 1,
         ),
         boxShadow: [
@@ -40,25 +47,15 @@ class NotificationCard extends StatelessWidget {
       ),
 
       child: Row(
-        crossAxisAlignment:
-            CrossAxisAlignment.start,
-
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
             width: 42,
             height: 42,
-
             decoration: BoxDecoration(
-              color: color.withValues(
-                alpha: .12,
-              ),
-
-              borderRadius:
-                  BorderRadius.circular(
-                12,
-              ),
+              color: color.withValues(alpha: .12),
+              borderRadius: BorderRadius.circular(12),
             ),
-
             child: Icon(
               icon,
               size: 22,
@@ -70,16 +67,14 @@ class NotificationCard extends StatelessWidget {
 
           Expanded(
             child: Column(
-              crossAxisAlignment:
-                  CrossAxisAlignment.start,
-
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontWeight:
-                        FontWeight.w700,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
                     fontSize: 15,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                   ),
                 ),
 
@@ -87,10 +82,8 @@ class NotificationCard extends StatelessWidget {
 
                 Text(
                   description,
-                  style: const TextStyle(
-                    color: Color(
-                      0xFF94A3B8,
-                    ),
+                  style: TextStyle(
+                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B),
                   ),
                 ),
 
@@ -100,9 +93,7 @@ class NotificationCard extends StatelessWidget {
                   time,
                   style: const TextStyle(
                     fontSize: 12,
-                    color: Color(
-                      0xFF94A3B8,
-                    ),
+                    color: Color(0xFF94A3B8),
                   ),
                 ),
               ],

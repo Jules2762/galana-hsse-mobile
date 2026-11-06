@@ -267,11 +267,59 @@ class OfflineStorageService {
   // SUIVIS MATÉRIELS (EQUIPMENT MONITORINGS)
   // ==========================================
 
+  /// Déduplique une liste d'équipements (par ID, tagNumber ou nom + catégorie)
+  static List<EquipmentItemData> deduplicateItems(List<EquipmentItemData> items) {
+    final List<EquipmentItemData> unique = [];
+    final Set<String> seenIds = {};
+    final Set<String> seenTags = {};
+    final Set<String> seenNames = {};
+
+    for (final item in items) {
+      final idStr = item.id?.toString();
+      final tagStr = item.tagNumber.trim();
+      final nameKey = '${item.designation.toLowerCase().trim()}__${item.type.toLowerCase().trim()}';
+
+      // 1. Détection par ID serveur
+      if (idStr != null && idStr.isNotEmpty && seenIds.contains(idStr)) {
+        continue;
+      }
+
+      // 2. Détection par tag officiel (sauf tags temporaires aléatoires)
+      if (tagStr.isNotEmpty && !tagStr.startsWith('EQ-temp') && seenTags.contains(tagStr)) {
+        continue;
+      }
+
+      // 3. Détection par nom + type si ID serveur absent
+      if (item.id == null && seenNames.contains(nameKey)) {
+        continue;
+      }
+
+      if (idStr != null && idStr.isNotEmpty) seenIds.add(idStr);
+      if (tagStr.isNotEmpty) seenTags.add(tagStr);
+      seenNames.add(nameKey);
+      unique.add(item);
+    }
+    return unique;
+  }
+
   /// Sauvegarde la liste des sessions de suivi matériel en local
   static Future<void> cacheEquipmentMonitorings(List<EquipmentMonitoringData> items) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final list = items.map((m) => m.toJson()).toList();
+      final List<EquipmentMonitoringData> unique = [];
+      final Set<String> seenKeys = {};
+
+      for (final m in items) {
+        final idKey = m.id?.toString();
+        final refKey = m.reference.trim();
+        final key = (idKey != null && idKey.isNotEmpty) ? 'id_$idKey' : 'ref_$refKey';
+        if (!seenKeys.contains(key)) {
+          seenKeys.add(key);
+          unique.add(m.copyWith(items: deduplicateItems(m.items)));
+        }
+      }
+
+      final list = unique.map((m) => m.toJson()).toList();
       await prefs.setString(_keyEquipmentMonitorings, jsonEncode(list));
     } catch (e) {
       debugPrint('[OfflineStorage] Erreur cache Suivis Matériels: $e');
@@ -285,7 +333,10 @@ class OfflineStorageService {
       final raw = prefs.getString(_keyEquipmentMonitorings);
       if (raw != null && raw.isNotEmpty) {
         final List list = jsonDecode(raw);
-        return list.map((json) => EquipmentMonitoringData.fromJson(Map<String, dynamic>.from(json))).toList();
+        return list.map((json) {
+          final m = EquipmentMonitoringData.fromJson(Map<String, dynamic>.from(json));
+          return m.copyWith(items: deduplicateItems(m.items));
+        }).toList();
       }
     } catch (e) {
       debugPrint('[OfflineStorage] Erreur lecture Suivis Matériels en cache: $e');
@@ -297,7 +348,11 @@ class OfflineStorageService {
   static Future<void> addCachedEquipmentMonitoring(EquipmentMonitoringData item) async {
     try {
       final items = await getCachedEquipmentMonitorings();
-      items.insert(0, item);
+      final cleanItem = item.copyWith(items: deduplicateItems(item.items));
+      items.removeWhere((m) =>
+          (cleanItem.id != null && m.id != null && m.id.toString() == cleanItem.id.toString()) ||
+          m.reference == cleanItem.reference);
+      items.insert(0, cleanItem);
       await cacheEquipmentMonitorings(items);
     } catch (_) {}
   }
@@ -306,14 +361,15 @@ class OfflineStorageService {
   static Future<void> updateCachedEquipmentMonitoring(EquipmentMonitoringData updated) async {
     try {
       final items = await getCachedEquipmentMonitorings();
+      final cleanUpdated = updated.copyWith(items: deduplicateItems(updated.items));
       final index = items.indexWhere((m) {
-        if (updated.id != null && m.id != null) return m.id.toString() == updated.id.toString();
-        return m.reference == updated.reference;
+        if (cleanUpdated.id != null && m.id != null) return m.id.toString() == cleanUpdated.id.toString();
+        return m.reference == cleanUpdated.reference;
       });
       if (index != -1) {
-        items[index] = updated;
+        items[index] = cleanUpdated;
       } else {
-        items.insert(0, updated);
+        items.insert(0, cleanUpdated);
       }
       await cacheEquipmentMonitorings(items);
     } catch (_) {}
@@ -337,9 +393,21 @@ class OfflineStorageService {
       if (idx != -1) {
         final current = monitorings[idx];
         final updatedItems = List<EquipmentItemData>.from(current.items);
-        updatedItems.insert(0, item);
-        final total = updatedItems.length;
-        final confCount = updatedItems.where((i) => i.conformity).length;
+
+        final existingIdx = updatedItems.indexWhere((i) =>
+            (item.id != null && i.id != null && i.id == item.id) ||
+            (item.tagNumber.isNotEmpty && i.tagNumber == item.tagNumber) ||
+            (i.designation.toLowerCase().trim() == item.designation.toLowerCase().trim() && i.type == item.type));
+
+        if (existingIdx != -1) {
+          updatedItems[existingIdx] = item;
+        } else {
+          updatedItems.insert(0, item);
+        }
+
+        final dedup = deduplicateItems(updatedItems);
+        final total = dedup.length;
+        final confCount = dedup.where((i) => i.conformity).length;
         final rate = total > 0 ? (confCount / total) * 100.0 : 100.0;
         String newStatus = current.status;
         String newRawStatus = current.rawStatus;
@@ -349,7 +417,7 @@ class OfflineStorageService {
         }
 
         monitorings[idx] = current.copyWith(
-          items: updatedItems,
+          items: dedup,
           conformityRate: rate,
           status: newStatus,
           rawStatus: newRawStatus,
@@ -369,18 +437,24 @@ class OfflineStorageService {
       if (idx != -1) {
         final current = monitorings[idx];
         final updatedItems = List<EquipmentItemData>.from(current.items);
+
         final itemIdx = updatedItems.indexWhere((i) =>
-            (item.id != null && i.id != null && i.id == item.id) || i.tagNumber == item.tagNumber);
+            (item.id != null && i.id != null && i.id == item.id) ||
+            (item.tagNumber.isNotEmpty && i.tagNumber == item.tagNumber) ||
+            (i.designation.toLowerCase().trim() == item.designation.toLowerCase().trim() && i.type == item.type));
+
         if (itemIdx != -1) {
           updatedItems[itemIdx] = item;
         } else {
           updatedItems.insert(0, item);
         }
-        final total = updatedItems.length;
-        final confCount = updatedItems.where((i) => i.conformity).length;
+
+        final dedup = deduplicateItems(updatedItems);
+        final total = dedup.length;
+        final confCount = dedup.where((i) => i.conformity).length;
         final rate = total > 0 ? (confCount / total) * 100.0 : 100.0;
         monitorings[idx] = current.copyWith(
-          items: updatedItems,
+          items: dedup,
           conformityRate: rate,
         );
         await cacheEquipmentMonitorings(monitorings);

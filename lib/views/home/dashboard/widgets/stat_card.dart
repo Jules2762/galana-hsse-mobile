@@ -20,8 +20,10 @@ class StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Material(
-      color: Colors.white,
+      color: isDark ? const Color(0xFF1E293B) : Colors.white,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -30,7 +32,9 @@ class StatCard extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: Colors.grey.shade200),
+            border: Border.all(
+              color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.03),
@@ -62,16 +66,17 @@ class StatCard extends StatelessWidget {
                     Icon(
                       Icons.arrow_forward_ios,
                       size: 12,
-                      color: Colors.grey.shade400,
+                      color: isDark ? const Color(0xFF64748B) : Colors.grey.shade400,
                     ),
                 ],
               ),
               const Spacer(),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
+                  color: isDark ? Colors.white : const Color(0xFF0F172A),
                 ),
               ),
               const SizedBox(height: 2),
@@ -80,7 +85,7 @@ class StatCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: Colors.grey.shade700,
+                  color: isDark ? const Color(0xFFCBD5E1) : Colors.grey.shade700,
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                 ),
@@ -92,7 +97,7 @@ class StatCard extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey.shade500,
+                    color: isDark ? const Color(0xFF94A3B8) : Colors.grey.shade500,
                     fontSize: 10,
                   ),
                 ),

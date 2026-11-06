@@ -41,4 +41,43 @@ class AppBottomNavigationTheme {
           },
         ),
       );
+
+  static NavigationBarThemeData get darkTheme =>
+      NavigationBarThemeData(
+        height: 72,
+
+        backgroundColor: AppColors.darkSurface,
+
+        elevation: 0,
+
+        indicatorColor: Colors.transparent,
+
+        labelBehavior:
+            NavigationDestinationLabelBehavior.alwaysShow,
+
+        labelTextStyle:
+            WidgetStateProperty.resolveWith<TextStyle>(
+          (states) {
+            return TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: states.contains(WidgetState.selected)
+                  ? AppColors.primary
+                  : AppColors.darkTextSecondary,
+            );
+          },
+        ),
+
+        iconTheme:
+            WidgetStateProperty.resolveWith<IconThemeData>(
+          (states) {
+            return IconThemeData(
+              size: 26,
+              color: states.contains(WidgetState.selected)
+                  ? AppColors.primary
+                  : AppColors.darkTextSecondary,
+            );
+          },
+        ),
+      );
 }

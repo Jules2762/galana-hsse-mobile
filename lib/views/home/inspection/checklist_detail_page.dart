@@ -272,8 +272,12 @@ class _ChecklistDetailPageState extends State<ChecklistDetailPage> {
 
   bool get isCompleted =>
       checklist.status.toLowerCase().contains('termin') ||
-      checklist.status.toUpperCase() == 'COMPLETED' ||
-      currentProgress >= 1.0;
+      checklist.status.toUpperCase() == 'COMPLETED';
+
+  bool get isDraft =>
+      checklist.status.toLowerCase().contains('planifi') ||
+      checklist.status.toLowerCase().contains('brouillon') ||
+      checklist.status.toLowerCase() == 'draft';
 
   String get reference => "#CHK-${checklist.id ?? '01'}";
   String get codeForm => "FOR-HSSE-CHK";
@@ -384,6 +388,162 @@ class _ChecklistDetailPageState extends State<ChecklistDetailPage> {
           ],
         ),
       ),
+    );
+  }
+
+  void _saveEvaluationDraft() {
+    final prog = currentProgress;
+    setState(() {
+      checklist = ChecklistItemData(
+        id: checklist.id,
+        title: checklist.title,
+        site: checklist.site,
+        inspector: checklist.inspector,
+        date: checklist.date,
+        progress: prog,
+        status: checklist.status,
+      );
+    });
+
+    if (checklist.id != null) {
+      final itemsPayload = checklistItems.map((it) {
+        return {
+          'id': it['id'],
+          'answer': it['answer'] ??
+              (it['yes'] == true
+                  ? 'OUI'
+                  : (it['yes'] == false ? 'NON' : 'N/A')),
+          'comment': it['obs'] ?? it['comment'],
+        };
+      }).toList();
+      ChecklistService.updateChecklist(checklist.id, {
+        'items': itemsPayload,
+        'progress': prog,
+      });
+    }
+  }
+
+  void _showCloseConfirmationDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final total = checklistItems.length;
+    final evaluated = evaluatedCount;
+    final isAllEvaluated = evaluated >= total && total > 0;
+
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF15803D).withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.verified, color: Color(0xFF15803D), size: 22),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  "Clôturer l'inspection",
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                isAllEvaluated
+                    ? "Toutes les vérifications ont été passées en revue ($evaluated/$total). Vous êtes sur le point de clôturer officiellement ce contrôle terrain :"
+                    : "Attention : seulement $evaluated point(s) sur $total ont été évalués. Souhaitez-vous tout de même clôturer ce contrôle terrain ?",
+                style: TextStyle(
+                  fontSize: 13,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: isDark ? const Color(0xFF334155) : AppColors.border),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "$reference • $codeForm",
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      checklist.title,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text("Conformes : $conformCount",
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF15803D))),
+                        Text("Écarts : $deviationsCount",
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFDC2626))),
+                        Text("Taux : ${(complianceRate * 100).toInt()}%",
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                "Une fois clôturée, la fiche officielle Galana sera horodatée et transmise pour synchronisation.",
+                style: TextStyle(
+                  fontSize: 11,
+                  color: isDark ? const Color(0xFF94A3B8) : AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Annuler"),
+            ),
+            ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF15803D),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+              icon: const Icon(Icons.check_circle, size: 18),
+              label: const Text("Confirmer et Clôturer"),
+              onPressed: () {
+                Navigator.pop(context);
+                _closeChecklist();
+              },
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -716,54 +876,72 @@ class _ChecklistDetailPageState extends State<ChecklistDetailPage> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                        ),
-                        icon: const Icon(Icons.check, size: 20),
-                        label: const Text(
-                          "Enregistrer l'évaluation terrain",
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        onPressed: () {
-                          final positive = conformCount;
-                          final dev = deviationsCount;
-                          final rate = complianceRate;
-                          final prog = currentProgress;
-
-                          setState(() {
-                            checklist = ChecklistItemData(
-                              id: checklist.id,
-                              title: checklist.title,
-                              site: checklist.site,
-                              inspector: checklist.inspector,
-                              date: checklist.date,
-                              progress: prog,
-                              status: checklist.status,
-                            );
-                          });
-
-                          Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: AppColors.primary,
-                              content: Text(
-                                "Évaluation mise à jour : $positive conforme(s), $dev écart(s) - Taux: ${(rate * 100).toInt()}%",
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: OutlinedButton.icon(
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: AppColors.primary, width: 1.5),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
                               ),
+                              icon: const Icon(Icons.save_outlined, size: 18, color: AppColors.primary),
+                              label: const Text(
+                                "Enregistrer",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                              onPressed: () {
+                                _saveEvaluationDraft();
+                                Navigator.pop(context);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    backgroundColor: AppColors.primary,
+                                    content: Text(
+                                      "Évaluation enregistrée : $conformCount conforme(s), $deviationsCount écart(s) - Taux: ${(complianceRate * 100).toInt()}%",
+                                    ),
+                                  ),
+                                );
+                              },
                             ),
-                          );
-                        },
-                      ),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: SizedBox(
+                            height: 48,
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF15803D),
+                                foregroundColor: Colors.white,
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                              ),
+                              icon: const Icon(Icons.check_circle_outline, size: 18),
+                              label: const Text(
+                                "Clôturer le contrôle",
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              onPressed: () {
+                                _saveEvaluationDraft();
+                                Navigator.pop(context);
+                                _showCloseConfirmationDialog();
+                              },
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -1997,9 +2175,6 @@ class _ChecklistDetailPageState extends State<ChecklistDetailPage> {
   // BOTTOM SHEET BAR
   // =========================================================================
   Widget _buildBottomSheetBar() {
-    final s = checklist.status.toLowerCase();
-    final isDraft = s.contains('planifi') || s.contains('brouillon') || s == 'draft';
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -2014,58 +2189,107 @@ class _ChecklistDetailPageState extends State<ChecklistDetailPage> {
         ],
       ),
       child: SafeArea(
-        child: SizedBox(
-          width: double.infinity,
-          height: 52,
-          child: ElevatedButton.icon(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: isDraft
-                  ? const Color(0xFF1D4ED8)
-                  : (isCompleted || currentProgress >= 1.0
-                      ? const Color(0xFF15803D)
-                      : AppColors.primary),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-            ),
-            icon: Icon(
-              isDraft
-                  ? Icons.play_arrow
-                  : (isCompleted
-                      ? Icons.picture_as_pdf
-                      : (currentProgress >= 1.0
-                          ? Icons.check_circle
-                          : Icons.edit_note)),
-              size: 22,
-            ),
-            label: Text(
-              isDraft
-                  ? "Démarrer le contrôle terrain"
-                  : (isCompleted
-                      ? "Télécharger la fiche officielle (PDF)"
-                      : (currentProgress >= 1.0
-                          ? "Clôturer le contrôle terrain"
-                          : "Évaluer / Continuer le contrôle")),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-              ),
-            ),
-            onPressed: () {
-              if (isDraft) {
-                _startChecklist();
-              } else if (isCompleted) {
-                ChecklistPdfService.printOrShareChecklist(checklist,
-                    items: checklistItems);
-              } else if (currentProgress >= 1.0) {
-                _closeChecklist();
-              } else {
-                _showChecklistEvaluationBottomSheet();
-              }
-            },
-          ),
-        ),
+        child: isDraft
+            ? SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1D4ED8),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                  icon: const Icon(Icons.play_arrow, size: 22),
+                  label: const Text(
+                    "Démarrer le contrôle terrain",
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
+                  onPressed: _startChecklist,
+                ),
+              )
+            : isCompleted
+                ? SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF15803D),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      icon: const Icon(Icons.picture_as_pdf, size: 22),
+                      label: const Text(
+                        "Télécharger la fiche officielle (PDF)",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      onPressed: () {
+                        ChecklistPdfService.printOrShareChecklist(checklist,
+                            items: checklistItems);
+                      },
+                    ),
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: OutlinedButton.icon(
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppColors.primary, width: 1.5),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(Icons.edit_note, color: AppColors.primary, size: 20),
+                            label: const Text(
+                              "Évaluer",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.primary,
+                                fontSize: 14,
+                              ),
+                            ),
+                            onPressed: _showChecklistEvaluationBottomSheet,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: SizedBox(
+                          height: 52,
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF15803D),
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14),
+                              ),
+                            ),
+                            icon: const Icon(Icons.check_circle_outline, size: 20),
+                            label: const Text(
+                              "Clôturer le contrôle",
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                              ),
+                            ),
+                            onPressed: _showCloseConfirmationDialog,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
       ),
     );
   }
@@ -2078,6 +2302,12 @@ class _ChecklistDetailPageState extends State<ChecklistDetailPage> {
         leading: const BackButton(),
         title: Text(reference),
         actions: [
+          if (!isCompleted && !isDraft)
+            IconButton(
+              icon: const Icon(Icons.check_circle_outline, color: Color(0xFF15803D)),
+              tooltip: "Clôturer le contrôle",
+              onPressed: _showCloseConfirmationDialog,
+            ),
           IconButton(
             icon: const Icon(Icons.picture_as_pdf_outlined),
             tooltip: "Télécharger la fiche officielle Galana (PDF)",

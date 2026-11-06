@@ -13,7 +13,7 @@ import 'package:gestion_hsse/views/home/profile/change_password_page.dart';
 import 'package:gestion_hsse/views/home/profile/edit_profile_page.dart';
 import 'package:gestion_hsse/views/home/rapport/report_details_page.dart';
 import 'package:gestion_hsse/views/home/settings/settings_page.dart';
-
+import 'package:gestion_hsse/views/home/sync/sync_queue_page.dart';
 import 'package:gestion_hsse/views/layouts/home_layout.dart';
 
 class AppRoutes {
@@ -22,12 +22,13 @@ class AppRoutes {
   static const String resetPassword = "/reset-password";
   static const String home = "/home";
   static const String checklistDetail = "/checklist-detail";
-  static const String inspectionQuestion ="/inspection-question";
-  static const String correctiveAction ="/corrective-action";
-  static const String settings ="/settings";
-  static const String reportDetails ="/report-details";
-  static const String editProfile ="/edit-profile";
-  static const String changePassword ="/change-password";
+  static const String inspectionQuestion = "/inspection-question";
+  static const String correctiveAction = "/corrective-action";
+  static const String settings = "/settings";
+  static const String syncQueue = "/sync-queue";
+  static const String reportDetails = "/report-details";
+  static const String editProfile = "/edit-profile";
+  static const String changePassword = "/change-password";
   static const String equipmentDetail = "/equipment-detail";
   static const String vmcDetail = "/vmc-detail";
   static const String inspections = "/inspections";
@@ -45,6 +46,7 @@ class AppRoutes {
     inspectionQuestion: (_) => const InspectionQuestionPage(),
     correctiveAction: (_) => const CorrectiveActionPage(),
     settings: (_) => const SettingsPage(),
+    syncQueue: (_) => const SyncQueuePage(),
     reportDetails: (_) => const ReportDetailPage(),
     editProfile: (_) => const EditProfilePage(),
     changePassword: (_) => const ChangePasswordPage(),

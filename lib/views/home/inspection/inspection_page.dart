@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/models/inspection_map_item.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
+import 'package:gestion_hsse/cores/services/checklist_service.dart';
+import 'package:gestion_hsse/cores/services/equipment_service.dart';
+import 'package:gestion_hsse/cores/services/vmc_service.dart';
 import 'package:gestion_hsse/cores/themes/app_colors.dart';
 import 'package:gestion_hsse/views/home/inspection/checklist/checklist_list_view.dart';
 import 'package:gestion_hsse/views/home/inspection/equipment/equipment_list_view.dart';
@@ -26,12 +30,33 @@ class _InspectionsPageState extends State<InspectionsPage>
   TabController? _tabController;
   int _currentTabIndex = 0;
   bool _isMapView = false;
+  int _vmcCount = 0;
+  int _checklistCount = 0;
+  int _equipmentCount = 0;
 
   @override
   void initState() {
     super.initState();
     _currentTabIndex = widget.initialTab;
     _ensureTabController();
+    _loadTabCounts();
+  }
+
+  Future<void> _loadTabCounts() async {
+    try {
+      final results = await Future.wait([
+        VmcService.getVmcs(),
+        ChecklistService.getChecklists(),
+        EquipmentService.getMonitorings(),
+      ]);
+      if (mounted) {
+        setState(() {
+          _vmcCount = (results[0] as List).length;
+          _checklistCount = (results[1] as List).length;
+          _equipmentCount = (results[2] as List).length;
+        });
+      }
+    } catch (_) {}
   }
 
   void _ensureTabController() {
@@ -75,8 +100,10 @@ class _InspectionsPageState extends State<InspectionsPage>
   @override
   Widget build(BuildContext context) {
     _ensureTabController();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: AppColors.lightBackground,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: Column(
         children: [
           // ==================== BANNIÈRE AUTO-SYNC ====================
@@ -90,9 +117,9 @@ class _InspectionsPageState extends State<InspectionsPage>
                 Expanded(
                   child: InspectionSegmentTab(
                     selectedIndex: _currentTabIndex,
-                    vmcCount: 14,
-                    checklistCount: 8,
-                    equipmentCount: 45,
+                    vmcCount: _vmcCount,
+                    checklistCount: _checklistCount,
+                    equipmentCount: _equipmentCount,
                     onTabSelected: (index) {
                       setState(() {
                         _currentTabIndex = index;
@@ -116,12 +143,14 @@ class _InspectionsPageState extends State<InspectionsPage>
                     padding: const EdgeInsets.symmetric(
                         horizontal: 10, vertical: 10),
                     decoration: BoxDecoration(
-                      color: _isMapView ? AppColors.primary : Colors.white,
+                      color: _isMapView
+                          ? AppColors.primary
+                          : (isDark ? const Color(0xFF1E293B) : Colors.white),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: _isMapView
                             ? AppColors.primary
-                            : const Color(0xFFE2E8F0),
+                            : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -145,13 +174,13 @@ class _InspectionsPageState extends State<InspectionsPage>
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          _isMapView ? "Liste" : "Carte",
+                          _isMapView ? context.l10n.listView : context.l10n.mapView,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.bold,
                             color: _isMapView
                                 ? Colors.white
-                                : AppColors.textPrimary,
+                                : (isDark ? Colors.white : AppColors.textPrimary),
                           ),
                         ),
                       ],
@@ -179,6 +208,11 @@ class _InspectionsPageState extends State<InspectionsPage>
                     children: [
                       // 1. VMC
                       VmcListView(
+                        onCountLoaded: (c) {
+                          if (mounted && _vmcCount != c) {
+                            setState(() => _vmcCount = c);
+                          }
+                        },
                         onVmcTap: (vmc) {
                           Navigator.pushNamed(
                             context,
@@ -189,10 +223,21 @@ class _InspectionsPageState extends State<InspectionsPage>
                       ),
 
                       // 2. CHECKLISTS
-                      const ChecklistListView(),
+                      ChecklistListView(
+                        onCountLoaded: (c) {
+                          if (mounted && _checklistCount != c) {
+                            setState(() => _checklistCount = c);
+                          }
+                        },
+                      ),
 
                       // 3. SUIVI DU MATÉRIEL
                       EquipmentMonitoringListView(
+                        onCountLoaded: (c) {
+                          if (mounted && _equipmentCount != c) {
+                            setState(() => _equipmentCount = c);
+                          }
+                        },
                         onMonitoringTap: (monitoring) {
                           Navigator.pushNamed(
                             context,

@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'package:gestion_hsse/cores/api/api_client.dart';
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/api/api_client.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/realtime_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
@@ -161,8 +162,13 @@ class VmcItemData {
 
 class VmcListView extends StatefulWidget {
   final Function(VmcItemData)? onVmcTap;
+  final ValueChanged<int>? onCountLoaded;
 
-  const VmcListView({super.key, this.onVmcTap});
+  const VmcListView({
+    super.key,
+    this.onVmcTap,
+    this.onCountLoaded,
+  });
 
   @override
   State<VmcListView> createState() => _VmcListViewState();
@@ -197,110 +203,12 @@ class _VmcListViewState extends State<VmcListView> {
 
   List<VmcItemData> vmcList = [];
 
-  static const List<VmcItemData> _defaultSeedList = [
-    VmcItemData(
-      id: 12,
-      reference: "#VMC-CAM-2026-045",
-      title: "Inspection Camion Citerne Hydrocarbures (Scania 480)",
-      type: "Inspection Camion",
-      code: "HSSE GALANA 2",
-      category: "INSPECTION",
-      site: "Terminal Pétrolier Toamasina",
-      inspector: "Mireille R. (Superviseur HSSE)",
-      date: "13 Oct 2026",
-      status: "En cours",
-      positivePoints: 13,
-      deviations: 1,
-      complianceRate: 0.93,
-    ),
-    VmcItemData(
-      id: 11,
-      reference: "#VMC-SS-2026-012",
-      title: "Visite VMC Station-Service Antsirabe Centre",
-      type: "Station-Service",
-      code: "HSSE GALANA 1",
-      category: "INSPECTION",
-      site: "Station Antsirabe Centre",
-      inspector: "Jean Rakoto (Directeur Réseau)",
-      date: "14 Oct 2026",
-      status: "En cours",
-      positivePoints: 11,
-      deviations: 2,
-      complianceRate: 0.85,
-    ),
-    VmcItemData(
-      id: 10,
-      reference: "#VMC-MAG-2026-008",
-      title: "Visite Conformité Magasin Lubrifiants & Agence",
-      type: "Visite Magasins & Agences",
-      code: "HSSE GALANA 3",
-      category: "INSPECTION",
-      site: "Agence Commerciale Ankorondrano",
-      inspector: "Jules Rakoto (Inspecteur HSSE)",
-      date: "11 Oct 2026",
-      status: "Planifiée",
-      positivePoints: 6,
-      deviations: 1,
-      complianceRate: 0.86,
-    ),
-    VmcItemData(
-      id: 5,
-      reference: "#VMC-SM-2026-031",
-      title: "Quart d'Heure Sécurité : Risques Électrostatiques & Dépotage",
-      type: "Safety Moment",
-      code: "SAFETY MOMENTS",
-      category: "SAFETY MOMENT",
-      site: "Terminal Pétrolier Toamasina",
-      inspector: "Chef de Quart Dépotage",
-      date: "14 Oct 2026",
-      status: "En cours",
-      positivePoints: 5,
-      deviations: 0,
-      complianceRate: 1.0,
-      participantsCount: 8,
-      theme: "Mise à la terre et équipotentialité des citernes",
-    ),
-    VmcItemData(
-      id: 8,
-      reference: "#VMC-SA-2026-019",
-      title: "Sensibilisation : Manipulation Produits Chimiques & Port des EPI",
-      type: "Safety Awareness",
-      code: "SAFETY TRAINING",
-      category: "SAFETY AWARENESS",
-      site: "Dépôt Antsirabe",
-      inspector: "Mireille R. (HSSE)",
-      date: "10 Oct 2026",
-      status: "Clôturée",
-      positivePoints: 4,
-      deviations: 0,
-      complianceRate: 1.0,
-      participantsCount: 14,
-      theme: "Fiches FDS et règles de manipulation",
-    ),
-    VmcItemData(
-      id: 9,
-      reference: "#VMC-SR-2026-005",
-      title: "Fiche de Remontée : Suintement bride vanne cuve C-04",
-      type: "Fiche de Remontée",
-      code: "FOR01-HSSE-ACC",
-      category: "SAFETY REPORT",
-      site: "Dépôt Ivato",
-      inspector: "Alain Rajaona (Chef Dépôt)",
-      date: "09 Oct 2026",
-      status: "En cours",
-      positivePoints: 3,
-      deviations: 1,
-      complianceRate: 0.75,
-      theme: "Incident d'étanchéité sous rétention",
-    ),
-  ];
-
   StreamSubscription<RealtimeEvent>? _realtimeSub;
 
   @override
   void initState() {
     super.initState();
-    vmcList = List.from(_defaultSeedList);
+    vmcList = [];
     _loadVmcs();
 
     // Abonnement temps réel
@@ -353,16 +261,12 @@ class _VmcListViewState extends State<VmcListView> {
         if (apiItems.isNotEmpty) {
           vmcList = apiItems;
           isLiveFromApi = true;
-        } else if (searchQuery.isEmpty &&
-            selectedTypeFilter == 0 &&
-            selectedStatusFilter == 0) {
-          // Fallback hors ligne
-          vmcList = List.from(_defaultSeedList);
-          isLiveFromApi = false;
         } else {
           vmcList = [];
+          isLiveFromApi = false;
         }
       });
+      widget.onCountLoaded?.call(apiItems.isNotEmpty ? apiItems.length : vmcList.length);
     }
   }
 
@@ -371,7 +275,7 @@ class _VmcListViewState extends State<VmcListView> {
 
   List<VmcItemData> get filteredVmcList {
     return vmcList.where((item) {
-      if (!ApiClient.isAssignedToCurrentUser(item.inspector, item.id)) {
+      if (onlyAssignedToMe && !ApiClient.isAssignedToCurrentUser(item.inspector, item.id)) {
         return false;
       }
 
@@ -451,6 +355,7 @@ class _VmcListViewState extends State<VmcListView> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final filtered = filteredVmcList;
     final inProgressCount =
         filteredVmcList.where((v) => v.status.toLowerCase() == 'en cours').length;
@@ -477,7 +382,7 @@ class _VmcListViewState extends State<VmcListView> {
                 });
               },
               decoration: InputDecoration(
-                hintText: "Rechercher une VMC (Station, Camion, Safety...)",
+                hintText: context.l10n.searchVmc,
                 prefixIcon: const Icon(Icons.search, size: 20),
                 suffixIcon: searchQuery.isNotEmpty
                     ? IconButton(
@@ -526,34 +431,50 @@ class _VmcListViewState extends State<VmcListView> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(right: 8),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEFF6FF),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFFBFDBFE),
-                          width: 1.0,
+                    child: InkWell(
+                      onTap: () {
+                        setState(() {
+                          onlyAssignedToMe = !onlyAssignedToMe;
+                        });
+                      },
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                        decoration: BoxDecoration(
+                          color: onlyAssignedToMe
+                              ? const Color(0xFF1D4ED8)
+                              : (isDark ? const Color(0xFF1E293B) : const Color(0xFFEFF6FF)),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: onlyAssignedToMe
+                                ? const Color(0xFF1D4ED8)
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFBFDBFE)),
+                            width: 1.0,
+                          ),
                         ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.person_pin,
-                            size: 15,
-                            color: Color(0xFF1D4ED8),
-                          ),
-                          const SizedBox(width: 5),
-                          Text(
-                            "Mes assignations ($assignedToMeCount)",
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF1D4ED8),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.person_pin,
+                              size: 15,
+                              color: onlyAssignedToMe
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
                             ),
-                          ),
-                        ],
+                            const SizedBox(width: 5),
+                            Text(
+                              "${context.l10n.assignedToMe} ($assignedToMeCount)",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: onlyAssignedToMe
+                                    ? Colors.white
+                                    : (isDark ? const Color(0xFF93C5FD) : const Color(0xFF1D4ED8)),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -582,25 +503,39 @@ class _VmcListViewState extends State<VmcListView> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : AppColors.border,
+                ),
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildStatColumn("${filteredVmcList.length}", "Mes VMC",
-                      AppColors.textPrimary),
+                  _buildStatColumn(
+                    "${filteredVmcList.length}",
+                    "Mes VMC",
+                    isDark ? Colors.white : AppColors.textPrimary,
+                  ),
                   Container(
-                      width: 1, height: 28, color: Colors.grey.shade200),
+                    width: 1,
+                    height: 28,
+                    color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+                  ),
                   _buildStatColumn("$inProgressCount", "En cours",
                       const Color(0xFF1D4ED8)),
                   Container(
-                      width: 1, height: 28, color: Colors.grey.shade200),
+                    width: 1,
+                    height: 28,
+                    color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+                  ),
                   _buildStatColumn(
                       "$closedCount", "Clôturées", const Color(0xFF15803D)),
                   Container(
-                      width: 1, height: 28, color: Colors.grey.shade200),
+                    width: 1,
+                    height: 28,
+                    color: isDark ? const Color(0xFF334155) : Colors.grey.shade200,
+                  ),
                   Row(
                     children: [
                       Container(
@@ -657,12 +592,12 @@ class _VmcListViewState extends State<VmcListView> {
                     Icon(Icons.assignment_outlined,
                         size: 48, color: Colors.grey.shade400),
                     const SizedBox(height: 12),
-                    const Text(
-                      "Aucune visite VMC attribuée",
+                    Text(
+                      context.l10n.noVmcsFound,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 16,
-                        color: AppColors.textPrimary,
+                        color: isDark ? Colors.white : AppColors.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 4),

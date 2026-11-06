@@ -18,6 +18,7 @@ class AnswerOptionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: onTap,
@@ -35,8 +36,8 @@ class AnswerOptionTile extends StatelessWidget {
 
         decoration: BoxDecoration(
           color: selected
-              ? color.withValues(alpha: .08)
-              : Colors.white,
+              ? color.withValues(alpha: isDark ? 0.2 : .08)
+              : (isDark ? const Color(0xFF1E293B) : Colors.white),
 
           borderRadius:
               BorderRadius.circular(16),
@@ -44,9 +45,7 @@ class AnswerOptionTile extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? color
-                : const Color(
-                    0xFFE2E8F0,
-                  ),
+                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
             width: 1.5,
           ),
         ),
@@ -67,9 +66,7 @@ class AnswerOptionTile extends StatelessWidget {
                 style: TextStyle(
                   color: selected
                       ? color
-                      : const Color(
-                          0xFF334155,
-                        ),
+                      : (isDark ? Colors.white : const Color(0xFF334155)),
                   fontWeight:
                       FontWeight.w600,
                 ),

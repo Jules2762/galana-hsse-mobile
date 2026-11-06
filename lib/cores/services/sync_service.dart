@@ -8,10 +8,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Modèle représentant une opération d'inspection en attente de synchronisation
 class SyncAction {
   final String id;
-  final String type; // 'VMC_STATUS', 'VMC_UPDATE', 'CHECKLIST_UPDATE', 'EQUIPMENT_UPDATE'
+  final String type; // 'CHECKLIST_UPDATE', 'VMC_UPDATE', 'EQUIPMENT_UPDATE', 'ACTION_CREATE', etc.
   final String title;
   final String endpoint;
-  final String method; // 'POST', 'PUT', 'PATCH'
+  final String method; // 'POST', 'PUT', 'PATCH', 'DELETE'
   final Map<String, dynamic> payload;
   final DateTime createdAt;
   int retryCount;
@@ -80,6 +80,23 @@ class SyncService extends ChangeNotifier {
   List<SyncAction> get queue => List.unmodifiable(_queue);
   int get pendingCount => _queue.length;
 
+  /// Nettoie et normalise l'endpoint pour éviter les conflits avec le baseUrl de Dio
+  static String cleanEndpoint(String endpoint) {
+    var ep = endpoint.trim();
+    if (ep.startsWith('http://') || ep.startsWith('https://')) {
+      return ep;
+    }
+    if (ep.startsWith('/api/')) {
+      ep = ep.substring(4);
+    } else if (ep.startsWith('api/')) {
+      ep = ep.substring(3);
+    }
+    if (!ep.startsWith('/')) {
+      ep = '/$ep';
+    }
+    return ep;
+  }
+
   /// Vérifie si une inspection spécifique a une synchronisation en attente
   bool hasPendingSyncFor(String targetId) {
     return _queue.any((action) =>
@@ -93,9 +110,9 @@ class SyncService extends ChangeNotifier {
     await _loadQueueFromStorage();
     await checkConnectivity();
 
-    // Surveillance périodique toutes les 7 secondes
+    // Surveillance périodique toutes les 10 secondes
     _heartbeatTimer?.cancel();
-    _heartbeatTimer = Timer.periodic(const Duration(seconds: 7), (_) {
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 10), (_) {
       checkConnectivity();
     });
   }
@@ -128,15 +145,14 @@ class SyncService extends ChangeNotifier {
     }
   }
 
-  /// Test de connectivité vers l'API backend
+  /// Test de connectivité vers l'API backend (timeout étendu à 6s)
   Future<bool> checkConnectivity() async {
     bool wasOnline = _isOnline;
     try {
-      // On teste un endpoint léger avec un timeout très court (3s)
       final testDio = Dio(
         BaseOptions(
-          connectTimeout: const Duration(seconds: 3),
-          receiveTimeout: const Duration(seconds: 3),
+          connectTimeout: const Duration(seconds: 6),
+          receiveTimeout: const Duration(seconds: 6),
         ),
       );
 
@@ -188,94 +204,144 @@ class SyncService extends ChangeNotifier {
   }
 
   /// Exécute et synchronise toutes les actions en attente
-  Future<void> syncAll() async {
-    if (_isSyncing || _queue.isEmpty) return;
+  /// [manual] permet de forcer la tentative même si checkConnectivity est temporairement négatif
+  Future<bool> syncAll({bool manual = false}) async {
+    if (_isSyncing) return false;
+    if (_queue.isEmpty) return true;
 
     _isSyncing = true;
     notifyListeners();
 
-    // S'assurer de l'authentification
+    try {
+      await ApiClient.ensureAuthenticated();
+
+      if (!manual) {
+        final online = await checkConnectivity();
+        if (!online) {
+          _isSyncing = false;
+          notifyListeners();
+          return false;
+        }
+      }
+
+      debugPrint('[SyncService] Démarrage de la synchronisation de ${_queue.length} action(s)...');
+
+      final List<SyncAction> toProcess = List.from(_queue);
+      int successCount = 0;
+
+      for (final action in toProcess) {
+        final success = await _executeAction(action);
+        if (success) {
+          successCount++;
+        }
+      }
+
+      _isSyncing = false;
+      _lastSyncTime = DateTime.now();
+      await _saveQueueToStorage();
+      notifyListeners();
+
+      debugPrint('[SyncService] Fin du cycle de synchronisation ($successCount/${toProcess.length} réussies). Restantes: ${_queue.length}');
+      return successCount > 0;
+    } catch (err) {
+      debugPrint('[SyncService] Erreur inattendue dans syncAll: $err');
+      _isSyncing = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Synchronise manuellement une seule action spécifique de la file d'attente
+  Future<bool> syncSingleAction(String actionId) async {
+    final idx = _queue.indexWhere((a) => a.id == actionId);
+    if (idx == -1) return false;
+
     await ApiClient.ensureAuthenticated();
-    if (!ApiClient.isAuthenticated) {
-      _isSyncing = false;
+    final action = _queue[idx];
+    return await _executeAction(action);
+  }
+
+  /// Exécute une action unitaire de synchronisation via Dio
+  Future<bool> _executeAction(SyncAction action) async {
+    try {
+      action.status = 'syncing';
       notifyListeners();
-      return;
-    }
 
-    // Re-vérifier l'état de la connexion
-    final online = await checkConnectivity();
-    if (!online) {
-      _isSyncing = false;
-      notifyListeners();
-      return;
-    }
+      final targetPath = cleanEndpoint(action.endpoint);
+      final options = Options(
+        method: action.method,
+        sendTimeout: const Duration(seconds: 15),
+        receiveTimeout: const Duration(seconds: 15),
+      );
 
-    debugPrint('[SyncService] Démarrage de la synchronisation de ${_queue.length} action(s)...');
+      Response response;
+      final method = action.method.toUpperCase();
 
-    // On copie la liste pour itérer proprement
-    final List<SyncAction> toProcess = List.from(_queue);
+      if (method == 'GET') {
+        response = await ApiClient.dio.get(targetPath, options: options);
+      } else if (method == 'PATCH') {
+        response = await ApiClient.dio.patch(targetPath, data: action.payload, options: options);
+      } else if (method == 'PUT') {
+        response = await ApiClient.dio.put(targetPath, data: action.payload, options: options);
+      } else if (method == 'DELETE') {
+        response = await ApiClient.dio.delete(targetPath, data: action.payload, options: options);
+      } else {
+        response = await ApiClient.dio.post(targetPath, data: action.payload, options: options);
+      }
 
-    for (final action in toProcess) {
-      try {
-        action.status = 'syncing';
+      if (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) {
+        debugPrint('[SyncService] Synchronisé avec succès : ${action.title}');
+        _queue.removeWhere((item) => item.id == action.id);
+        _isOnline = true;
+        await _saveQueueToStorage();
         notifyListeners();
-
-        Response response;
-        final options = Options(method: action.method);
-
-        if (action.method.toUpperCase() == 'GET') {
-          response = await ApiClient.dio.get(action.endpoint, options: options);
-        } else if (action.method.toUpperCase() == 'PATCH') {
-          response = await ApiClient.dio.patch(action.endpoint, data: action.payload, options: options);
-        } else if (action.method.toUpperCase() == 'PUT') {
-          response = await ApiClient.dio.put(action.endpoint, data: action.payload, options: options);
-        } else if (action.method.toUpperCase() == 'DELETE') {
-          response = await ApiClient.dio.delete(action.endpoint, data: action.payload, options: options);
-        } else {
-          response = await ApiClient.dio.post(action.endpoint, data: action.payload, options: options);
-        }
-
-        if (response.statusCode != null && response.statusCode! >= 200 && response.statusCode! < 300) {
-          debugPrint('[SyncService] Synchronisé avec succès : ${action.title}');
-          _queue.removeWhere((item) => item.id == action.id);
-          await _saveQueueToStorage();
-        } else {
-          debugPrint('[SyncService] Réponse inattendue (${response.statusCode}) pour ${action.title}');
-          action.retryCount++;
-          action.status = 'failed';
-          action.errorMessage = 'Erreur HTTP ${response.statusCode}';
-        }
-      } on DioException catch (dioErr) {
-        debugPrint('[SyncService] Échec réseau pour ${action.title} : ${dioErr.type}');
-        // Si c'est une déconnexion ou timeout, on interrompt le cycle et attend la reconnexion
-        if (dioErr.type == DioExceptionType.connectionError ||
-            dioErr.type == DioExceptionType.connectionTimeout ||
-            dioErr.type == DioExceptionType.sendTimeout ||
-            dioErr.type == DioExceptionType.receiveTimeout) {
-          _isOnline = false;
-          action.status = 'pending';
-          break; // Sortir de la boucle, le prochain battement reprendra
-        } else if (dioErr.response?.statusCode == 404 || dioErr.response?.statusCode == 422) {
-          // Erreur de validation ou ressource déjà traitée : on évite le blocage infini
-          action.retryCount++;
-          if (action.retryCount >= 3) {
-            _queue.removeWhere((item) => item.id == action.id);
-            await _saveQueueToStorage();
-          }
-        }
-      } catch (err) {
-        debugPrint('[SyncService] Erreur inconnue : $err');
+        return true;
+      } else {
+        debugPrint('[SyncService] Réponse inattendue (${response.statusCode}) pour ${action.title}');
         action.retryCount++;
         action.status = 'failed';
+        action.errorMessage = 'Erreur HTTP ${response.statusCode}';
+        await _saveQueueToStorage();
+        notifyListeners();
+        return false;
       }
+    } on DioException catch (dioErr) {
+      debugPrint('[SyncService] Échec réseau pour ${action.title} : ${dioErr.type}');
+      final dynamic resData = dioErr.response?.data;
+      String errorDesc = 'Erreur réseau (${dioErr.type.name})';
+
+      if (resData is Map) {
+        errorDesc = resData['message']?.toString() ??
+            resData['error']?.toString() ??
+            resData['errors']?.toString() ??
+            errorDesc;
+      } else if (dioErr.response?.statusMessage != null) {
+        errorDesc = '${dioErr.response!.statusCode} ${dioErr.response!.statusMessage}';
+      }
+
+      action.status = 'failed';
+      action.errorMessage = errorDesc;
+      action.retryCount++;
+
+      if (dioErr.type == DioExceptionType.connectionError ||
+          dioErr.type == DioExceptionType.connectionTimeout ||
+          dioErr.type == DioExceptionType.sendTimeout ||
+          dioErr.type == DioExceptionType.receiveTimeout) {
+        _isOnline = false;
+      }
+
+      await _saveQueueToStorage();
+      notifyListeners();
+      return false;
+    } catch (err) {
+      debugPrint('[SyncService] Erreur inconnue : $err');
+      action.retryCount++;
+      action.status = 'failed';
+      action.errorMessage = err.toString();
+      await _saveQueueToStorage();
+      notifyListeners();
+      return false;
     }
-
-    _isSyncing = false;
-    _lastSyncTime = DateTime.now();
-    await _saveQueueToStorage();
-    notifyListeners();
-
-    debugPrint('[SyncService] Fin du cycle de synchronisation. Actions restantes: ${_queue.length}');
   }
 
   /// Supprime manuellement une action de la file

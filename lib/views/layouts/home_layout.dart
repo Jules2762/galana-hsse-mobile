@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/routes/app_routes.dart';
 import 'package:gestion_hsse/cores/services/notification_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
@@ -54,56 +55,65 @@ class _StateHomeLayout extends State<HomeLayout> {
         const ProfilePage(),
       ];
 
-  final List<NavigationDestination> items = [
-    const NavigationDestination(
-      icon: Icon(Icons.home_outlined),
-      selectedIcon: Icon(Icons.home),
-      label: 'Accueil',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.fact_check_outlined),
-      selectedIcon: Icon(Icons.fact_check),
-      label: 'Inspections',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.description_outlined),
-      selectedIcon: Icon(Icons.description),
-      label: 'Rapports',
-    ),
-    NavigationDestination(
-      icon: ValueListenableBuilder<int>(
-        valueListenable: NotificationService.unreadCountNotifier,
-        builder: (context, count, _) {
-          return Badge(
-            isLabelVisible: count > 0,
-            offset: const Offset(6, -6),
-            label: Text("$count"),
-            child: const Icon(Icons.notifications_outlined),
-          );
-        },
+  List<NavigationDestination> _buildNavItems(BuildContext context) {
+    final l10n = context.l10n;
+    return [
+      NavigationDestination(
+        icon: const Icon(Icons.home_outlined),
+        selectedIcon: const Icon(Icons.home),
+        label: l10n.home,
       ),
-      selectedIcon: ValueListenableBuilder<int>(
-        valueListenable: NotificationService.unreadCountNotifier,
-        builder: (context, count, _) {
-          return Badge(
-            isLabelVisible: count > 0,
-            offset: const Offset(6, -6),
-            label: Text("$count"),
-            child: const Icon(Icons.notifications),
-          );
-        },
+      NavigationDestination(
+        icon: const Icon(Icons.fact_check_outlined),
+        selectedIcon: const Icon(Icons.fact_check),
+        label: l10n.inspections,
       ),
-      label: 'Notifications',
-    ),
-    const NavigationDestination(
-      icon: Icon(Icons.person_outline),
-      selectedIcon: Icon(Icons.person),
-      label: 'Profil',
-    ),
-  ];
+      NavigationDestination(
+        icon: const Icon(Icons.description_outlined),
+        selectedIcon: const Icon(Icons.description),
+        label: l10n.reports,
+      ),
+      NavigationDestination(
+        icon: ValueListenableBuilder<int>(
+          valueListenable: NotificationService.unreadCountNotifier,
+          builder: (context, count, _) {
+            return Badge(
+              isLabelVisible: count > 0,
+              offset: const Offset(6, -6),
+              label: Text("$count"),
+              child: const Icon(Icons.notifications_outlined),
+            );
+          },
+        ),
+        selectedIcon: ValueListenableBuilder<int>(
+          valueListenable: NotificationService.unreadCountNotifier,
+          builder: (context, count, _) {
+            return Badge(
+              isLabelVisible: count > 0,
+              offset: const Offset(6, -6),
+              label: Text("$count"),
+              child: const Icon(Icons.notifications),
+            );
+          },
+        ),
+        label: l10n.notifications,
+      ),
+      NavigationDestination(
+        icon: const Icon(Icons.person_outline),
+        selectedIcon: const Icon(Icons.person),
+        label: l10n.profile,
+      ),
+    ];
+  }
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final surfaceColor = theme.colorScheme.surface;
+    final borderColor = isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0);
+    final titleColor = isDark ? Colors.white : const Color(0xFF0F172A);
+
     // ignore: deprecated_member_use
     return PopScope(
       canPop: false,
@@ -125,9 +135,9 @@ class _StateHomeLayout extends State<HomeLayout> {
           ScaffoldMessenger.of(context)
             ..hideCurrentSnackBar()
             ..showSnackBar(
-              const SnackBar(
-                content: Text('Appuyez de nouveau pour quitter'),
-                duration: Duration(seconds: 2),
+              SnackBar(
+                content: Text(context.l10n.pressBackAgainToExit),
+                duration: const Duration(seconds: 2),
               ),
             );
           return;
@@ -138,11 +148,11 @@ class _StateHomeLayout extends State<HomeLayout> {
       child: Scaffold(
         appBar: AppBar(
           elevation: 0,
-          backgroundColor: Colors.white,
+          backgroundColor: surfaceColor,
           scrolledUnderElevation: 1,
-          bottom: const PreferredSize(
-            preferredSize: Size.fromHeight(1),
-            child: Divider(height: 1, color: Color(0xFFE2E8F0)),
+          bottom: PreferredSize(
+            preferredSize: const Size.fromHeight(1),
+            child: Divider(height: 1, color: borderColor),
           ),
           leadingWidth: 54,
           leading: Padding(
@@ -150,9 +160,9 @@ class _StateHomeLayout extends State<HomeLayout> {
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E293B) : Colors.white,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(color: borderColor),
               ),
               child: Image.asset(
                 "assets/logo-galana.webp",
@@ -163,13 +173,13 @@ class _StateHomeLayout extends State<HomeLayout> {
           title: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisSize: MainAxisSize.min,
-            children: const [
+            children: [
               Text(
                 "Galana HSSE",
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF0F172A),
+                  color: titleColor,
                   letterSpacing: -0.3,
                 ),
               ),
@@ -178,7 +188,7 @@ class _StateHomeLayout extends State<HomeLayout> {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w500,
-                  color: Color(0xFF64748B),
+                  color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                 ),
               ),
             ],
@@ -230,20 +240,7 @@ class _StateHomeLayout extends State<HomeLayout> {
                   child: InkWell(
                     borderRadius: BorderRadius.circular(20),
                     onTap: () {
-                      if (!isOnline) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              pending > 0
-                                  ? '$pending inspection(s) en attente de synchronisation.'
-                                  : 'Mode Hors-ligne actif. Données stockées localement.',
-                            ),
-                            backgroundColor: Colors.orange.shade800,
-                          ),
-                        );
-                      } else {
-                        SyncService.instance.syncAll();
-                      }
+                      Navigator.pushNamed(context, AppRoutes.syncQueue);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -284,12 +281,12 @@ class _StateHomeLayout extends State<HomeLayout> {
                           const SizedBox(width: 6),
                           Text(
                             isSyncing
-                                ? 'SYNCHRO...'
+                                ? context.l10n.syncing
                                 : (isOnline
-                                    ? 'EN LIGNE'
+                                    ? context.l10n.online
                                     : (pending > 0
-                                        ? '$pending EN ATTENTE'
-                                        : 'HORS-LIGNE')),
+                                        ? '$pending ${context.l10n.pendingSync}'
+                                        : context.l10n.offline)),
                             style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.w800,
@@ -313,14 +310,14 @@ class _StateHomeLayout extends State<HomeLayout> {
           children: _children,
         ),
         bottomNavigationBar: Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: BoxDecoration(
+            color: surfaceColor,
             border: Border(
-              top: BorderSide(color: Color(0xFFE2E8F0), width: 1),
+              top: BorderSide(color: borderColor, width: 1),
             ),
           ),
           child: NavigationBar(
-            backgroundColor: Colors.white,
+            backgroundColor: surfaceColor,
             elevation: 0,
             height: 68,
             indicatorColor: AppColors.primary.withValues(alpha: 0.12),
@@ -330,7 +327,7 @@ class _StateHomeLayout extends State<HomeLayout> {
                 currentIndex = index;
               });
             },
-            destinations: items,
+            destinations: _buildNavItems(context),
           ),
         ),
       ),

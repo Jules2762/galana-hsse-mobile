@@ -42,4 +42,57 @@ class AppTextTheme {
           color: AppColors.textDisabled,
         ),
       );
+
+  static TextTheme get darkTheme => const TextTheme(
+        displayLarge: TextStyle(
+          fontSize: 32,
+          fontWeight: FontWeight.bold,
+          color: AppColors.darkTextPrimary,
+        ),
+
+        headlineLarge: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          color: AppColors.darkTextPrimary,
+        ),
+
+        headlineMedium: TextStyle(
+          fontSize: 20,
+          fontWeight: FontWeight.w600,
+          color: AppColors.darkTextPrimary,
+        ),
+
+        titleLarge: TextStyle(
+          fontSize: 18,
+          fontWeight: FontWeight.w600,
+          color: AppColors.darkTextPrimary,
+        ),
+
+        titleMedium: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppColors.darkTextPrimary,
+        ),
+
+        titleSmall: TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+          color: AppColors.darkTextPrimary,
+        ),
+
+        bodyLarge: TextStyle(
+          fontSize: 16,
+          color: AppColors.darkTextPrimary,
+        ),
+
+        bodyMedium: TextStyle(
+          fontSize: 14,
+          color: AppColors.darkTextSecondary,
+        ),
+
+        bodySmall: TextStyle(
+          fontSize: 12,
+          color: AppColors.darkTextDisabled,
+        ),
+      );
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:gestion_hsse/cores/extensions/context_extensions.dart';
 import 'package:gestion_hsse/cores/models/emergency_contact_model.dart';
 import 'package:gestion_hsse/cores/services/emergency_contact_service.dart';
 import 'package:gestion_hsse/cores/services/sync_service.dart';
@@ -16,6 +17,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   final TextEditingController _searchController = TextEditingController();
 
   bool _isLoading = true;
+  bool _isRefreshing = false;
   bool _isMapMode = false;
   List<EmergencyContactModel> _allContacts = [];
   List<EmergencyContactModel> _filteredContacts = [];
@@ -68,8 +70,8 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
     _searchController.addListener(_onSearchChanged);
+    _loadInitialLocalData();
   }
 
   @override
@@ -78,31 +80,92 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
     super.dispose();
   }
 
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
-    try {
-      final mapData = await EmergencyContactService.getMapData();
-      final contacts = mapData['contacts'] as List<EmergencyContactModel>? ?? [];
-      final sites = mapData['sites'] as List<EmergencySiteModel>? ?? [];
+  /// 1. CHARGEMENT LOCAL D'ABORD (Instantané et complet)
+  Future<void> _loadInitialLocalData() async {
+    final localData = await EmergencyContactService.getLocalData();
+    final contacts = localData['contacts'] as List<EmergencyContactModel>? ?? [];
+    final sites = localData['sites'] as List<EmergencySiteModel>? ?? [];
 
-      if (mounted) {
+    if (mounted) {
+      setState(() {
+        _allContacts = contacts;
+        _allSites = sites;
+        _applyFilters();
+        _isLoading = false;
+      });
+    }
+
+    // 2. SYNCHRONISATION SERVEUR EN ARRIÈRE-PLAN SI CONNECTÉ
+    _syncWithServer(silent: true);
+  }
+
+  /// 2. SYNCHRONISATION SERVEUR
+  Future<void> _syncWithServer({bool silent = false}) async {
+    if (!silent && mounted) {
+      setState(() => _isRefreshing = true);
+    }
+
+    try {
+      final remoteData = await EmergencyContactService.refreshFromServer();
+      if (remoteData != null && mounted) {
+        final contacts = remoteData['contacts'] as List<EmergencyContactModel>? ?? [];
+        final sites = remoteData['sites'] as List<EmergencySiteModel>? ?? [];
+
         setState(() {
           _allContacts = contacts;
           _allSites = sites;
           _applyFilters();
-          _isLoading = false;
         });
+
+        if (!silent && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle_rounded, color: Colors.white, size: 18),
+                  const SizedBox(width: 8),
+                  Text("${contacts.length} contacts d'urgence synchronisés avec le serveur"),
+                ],
+              ),
+              backgroundColor: const Color(0xFF0F9D58),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      } else if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.wifi_off_rounded, color: Colors.white, size: 18),
+                SizedBox(width: 8),
+                Text("Mode hors-ligne : contacts locaux disponibles"),
+              ],
+            ),
+            backgroundColor: Color(0xFFD97706),
+            duration: Duration(seconds: 2),
+          ),
+        );
       }
     } catch (_) {
-      final fallback = EmergencyContactService.defaultEmergencyContacts;
-      if (mounted) {
-        setState(() {
-          _allContacts = fallback;
-          _applyFilters();
-          _isLoading = false;
-        });
+      if (!silent && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Serveur inaccessible. Vos contacts locaux restent actifs."),
+            backgroundColor: Color(0xFFD97706),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } finally {
+      if (!silent && mounted) {
+        setState(() => _isRefreshing = false);
       }
     }
+  }
+
+  Future<void> _loadData() async {
+    await _syncWithServer(silent: false);
   }
 
   void _onSearchChanged() {
@@ -178,10 +241,11 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   }
 
   void _showSiteFilterDialog() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -209,32 +273,38 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         "Filtrer par Station Galana",
                         style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: Color(0xFF0F172A),
+                          color: isDark ? Colors.white : const Color(0xFF0F172A),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.close),
+                        icon: Icon(Icons.close, color: isDark ? Colors.white70 : Colors.black54),
                         onPressed: () => Navigator.pop(ctx),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   TextField(
+                    style: TextStyle(color: isDark ? Colors.white : const Color(0xFF0F172A)),
                     decoration: InputDecoration(
                       hintText: "Chercher une station, ville...",
-                      prefixIcon: const Icon(Icons.search, size: 20),
+                      hintStyle: TextStyle(color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8)),
+                      prefixIcon: Icon(Icons.search, size: 20, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                       filled: true,
-                      fillColor: const Color(0xFFF1F5F9),
+                      fillColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                       contentPadding: const EdgeInsets.symmetric(
                           horizontal: 12, vertical: 10),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide.none,
+                        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.transparent),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: isDark ? const Color(0xFF334155) : Colors.transparent),
                       ),
                     ),
                     onChanged: (val) {
@@ -264,16 +334,16 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                     ),
                   Expanded(
                     child: sites.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
                               "Aucune station trouvée",
-                              style: TextStyle(color: Color(0xFF64748B)),
+                              style: TextStyle(color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             ),
                           )
                         : ListView.separated(
                             itemCount: sites.length,
                             separatorBuilder: (_, _) =>
-                                const Divider(height: 1),
+                                Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                             itemBuilder: (context, index) {
                               final site = sites[index];
                               final isSelected =
@@ -287,8 +357,8 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                                   padding: const EdgeInsets.all(6),
                                   decoration: BoxDecoration(
                                     color: isSelected
-                                        ? const Color(0xFFDCFCE7)
-                                        : const Color(0xFFF1F5F9),
+                                        ? const Color(0xFF0F9D58).withValues(alpha: 0.2)
+                                        : (isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9)),
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: Icon(
@@ -296,7 +366,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                                     size: 20,
                                     color: isSelected
                                         ? const Color(0xFF0F9D58)
-                                        : const Color(0xFF475569),
+                                        : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569)),
                                   ),
                                 ),
                                 title: Text(
@@ -308,15 +378,15 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                                         : FontWeight.w600,
                                     color: isSelected
                                         ? const Color(0xFF0F9D58)
-                                        : const Color(0xFF1E293B),
+                                        : (isDark ? Colors.white : const Color(0xFF1E293B)),
                                   ),
                                 ),
                                 subtitle: site.locality != null
                                     ? Text(
                                         site.locality!,
-                                        style: const TextStyle(
+                                        style: TextStyle(
                                             fontSize: 12,
-                                            color: Color(0xFF64748B)),
+                                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                                       )
                                     : null,
                                 trailing: isSelected
@@ -344,10 +414,11 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   }
 
   void _showDetailBottomSheet(EmergencyContactModel item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -364,7 +435,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                   width: 44,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFCBD5E1),
+                    color: isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
@@ -416,23 +487,23 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                         const SizedBox(height: 6),
                         Text(
                           item.name,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 17,
                             fontWeight: FontWeight.bold,
-                            color: Color(0xFF0F172A),
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                           ),
                         ),
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            const Icon(Icons.location_on_outlined,
-                                size: 14, color: Color(0xFF64748B)),
+                            Icon(Icons.location_on_outlined,
+                                size: 14, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             const SizedBox(width: 4),
                             Text(
                               '${item.locality}${item.province != null ? ' (${item.province})' : ''}',
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: Color(0xFF64748B),
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -445,7 +516,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
               ),
 
               const SizedBox(height: 20),
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              Divider(height: 1, color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
               const SizedBox(height: 16),
 
               // Boutons d'appel pour chaque ligne
@@ -465,6 +536,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                 number: item.contact1,
                 color: item.typeColor,
                 isPrimary: true,
+                isDark: isDark,
               ),
 
               if (item.contact2 != null && item.contact2!.isNotEmpty) ...[
@@ -473,6 +545,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                   title: "Ligne Secondaire",
                   number: item.contact2!,
                   color: const Color(0xFF2563EB),
+                  isDark: isDark,
                 ),
               ],
 
@@ -482,6 +555,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                   title: "Ligne Tertiaire / Mobile",
                   number: item.contact3!,
                   color: const Color(0xFF0D9488),
+                  isDark: isDark,
                 ),
               ],
 
@@ -492,6 +566,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                   icon: Icons.map_outlined,
                   title: "Adresse géographique",
                   content: item.address!,
+                  isDark: isDark,
                 ),
               ],
 
@@ -501,6 +576,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                   icon: Icons.info_outline,
                   title: "Consignes & Périmètre d'intervention",
                   content: item.notes!,
+                  isDark: isDark,
                 ),
               ],
 
@@ -524,9 +600,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF1F5F9),
+                        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                         borderRadius: BorderRadius.circular(6),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -536,10 +612,10 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                           const SizedBox(width: 4),
                           Text(
                             siteName,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xFF1E293B),
+                              color: isDark ? Colors.white : const Color(0xFF1E293B),
                             ),
                           ),
                         ],
@@ -560,13 +636,14 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
     required String number,
     required Color color,
     bool isPrimary = false,
+    bool isDark = false,
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isPrimary ? color.withValues(alpha: 0.08) : Colors.white,
+        color: isPrimary ? color.withValues(alpha: isDark ? 0.2 : 0.08) : (isDark ? const Color(0xFF0F172A) : Colors.white),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isPrimary ? color.withValues(alpha: 0.3) : const Color(0xFFE2E8F0),
+          color: isPrimary ? color.withValues(alpha: isDark ? 0.4 : 0.3) : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
           width: isPrimary ? 1.5 : 1,
         ),
       ),
@@ -591,15 +668,15 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: isPrimary ? color : const Color(0xFF64748B),
+                    color: isPrimary ? color : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                   ),
                 ),
                 Text(
                   number,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: isDark ? Colors.white : const Color(0xFF0F172A),
                     letterSpacing: 0.5,
                   ),
                 ),
@@ -633,18 +710,19 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
     required IconData icon,
     required String title,
     required String content,
+    bool isDark = false,
   }) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFF64748B)),
+          Icon(icon, size: 18, color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
           const SizedBox(width: 10),
           Expanded(
             child: Column(
@@ -652,18 +730,18 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF64748B),
+                    color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                   ),
                 ),
                 const SizedBox(height: 3),
                 Text(
                   content,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: Color(0xFF1E293B),
+                    color: isDark ? Colors.white : const Color(0xFF1E293B),
                     height: 1.3,
                   ),
                 ),
@@ -677,27 +755,29 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
         scrolledUnderElevation: 1,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new,
-              size: 20, color: Color(0xFF0F172A)),
+          icon: Icon(Icons.arrow_back_ios_new,
+              size: 20, color: isDark ? Colors.white : const Color(0xFF0F172A)),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
-          children: const [
+          children: [
             Text(
-              "Contacts d'Urgence",
+              context.l10n.emergencyContacts,
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A),
+                color: isDark ? Colors.white : const Color(0xFF0F172A),
                 letterSpacing: -0.3,
               ),
             ),
@@ -706,7 +786,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
               style: TextStyle(
                 fontSize: 11,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF64748B),
+                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
               ),
             ),
           ],
@@ -720,14 +800,16 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                 margin: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: isOnline
-                      ? const Color(0xFFDCFCE7)
-                      : const Color(0xFFFEF3C7),
+                  color: isDark
+                      ? (isOnline
+                          ? const Color(0xFF064E3B).withValues(alpha: 0.6)
+                          : const Color(0xFF78350F).withValues(alpha: 0.6))
+                      : (isOnline ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7)),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: isOnline
-                        ? const Color(0xFF86EFAC)
-                        : const Color(0xFFFCD34D),
+                    color: isDark
+                        ? (isOnline ? const Color(0xFF059669) : const Color(0xFFD97706))
+                        : (isOnline ? const Color(0xFF86EFAC) : const Color(0xFFFCD34D)),
                   ),
                 ),
                 child: Row(
@@ -745,13 +827,13 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      isOnline ? "EN LIGNE" : "HORS-LIGNE",
+                      isOnline ? context.l10n.online : context.l10n.offline,
                       style: TextStyle(
                         fontSize: 9,
                         fontWeight: FontWeight.w800,
-                        color: isOnline
-                            ? const Color(0xFF15803D)
-                            : const Color(0xFFB45309),
+                        color: isDark
+                            ? (isOnline ? const Color(0xFF6EE7B7) : const Color(0xFFFDE68A))
+                            : (isOnline ? const Color(0xFF15803D) : const Color(0xFFB45309)),
                       ),
                     ),
                   ],
@@ -760,26 +842,41 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
             },
           ),
           IconButton(
-            icon: const Icon(Icons.refresh, color: Color(0xFF0F172A)),
-            tooltip: "Actualiser",
-            onPressed: _loadData,
+            icon: _isRefreshing
+                ? SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: isDark ? Colors.white : const Color(0xFF0F172A),
+                    ),
+                  )
+                : Icon(Icons.refresh, color: isDark ? Colors.white : const Color(0xFF0F172A)),
+            tooltip: "Actualiser depuis le serveur",
+            onPressed: _isRefreshing ? null : () => _syncWithServer(silent: false),
           ),
         ],
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Container(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF1E293B) : Colors.white,
+              border: Border(
+                bottom: BorderSide(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
+              ),
             ),
             child: Container(
               height: 42,
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: const Color(0xFFF1F5F9),
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFFE2E8F0)),
+                border: Border.all(
+                  color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                ),
               ),
               child: Row(
                 children: [
@@ -811,7 +908,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                             Icon(
                               Icons.format_list_bulleted_rounded,
                               size: 16,
-                              color: !_isMapMode ? Colors.white : const Color(0xFF64748B),
+                              color: !_isMapMode
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -819,7 +918,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: !_isMapMode ? FontWeight.w700 : FontWeight.w600,
-                                color: !_isMapMode ? Colors.white : const Color(0xFF64748B),
+                                color: !_isMapMode
+                                    ? Colors.white
+                                    : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF64748B)),
                               ),
                             ),
                             const SizedBox(width: 6),
@@ -828,7 +929,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                               decoration: BoxDecoration(
                                 color: !_isMapMode
                                     ? Colors.white.withValues(alpha: 0.25)
-                                    : const Color(0xFFE2E8F0),
+                                    : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: Text(
@@ -836,7 +937,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  color: !_isMapMode ? Colors.white : const Color(0xFF475569),
+                                  color: !_isMapMode
+                                      ? Colors.white
+                                      : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569)),
                                 ),
                               ),
                             ),
@@ -874,7 +977,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                             Icon(
                               Icons.map_rounded,
                               size: 16,
-                              color: _isMapMode ? Colors.white : const Color(0xFF64748B),
+                              color: _isMapMode
+                                  ? Colors.white
+                                  : (isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B)),
                             ),
                             const SizedBox(width: 6),
                             Text(
@@ -1184,9 +1289,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                               : FontWeight.w600,
                           color: isSelected
                               ? Colors.white
-                              : const Color(0xFF334155),
+                              : (isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155)),
                         ),
-                        backgroundColor: Colors.white,
+                        backgroundColor: isDark ? const Color(0xFF1E293B) : Colors.white,
                         selectedColor: const Color(0xFF0F9D58),
                         checkmarkColor: Colors.white,
                         showCheckmark: false,
@@ -1195,7 +1300,7 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                           side: BorderSide(
                             color: isSelected
                                 ? const Color(0xFF0F9D58)
-                                : const Color(0xFFE2E8F0),
+                                : (isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0)),
                           ),
                         ),
                         onSelected: (_) => _selectType(cat['key']!),
@@ -1336,14 +1441,18 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
   }
 
   Widget _buildContactCard(EmergencyContactModel item) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return InkWell(
       borderRadius: BorderRadius.circular(16),
       onTap: () => _showDetailBottomSheet(item),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isDark ? const Color(0xFF1E293B) : Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(
+            color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+          ),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.03),
@@ -1401,21 +1510,24 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F5F9),
+                            color: isDark ? const Color(0xFF334155) : const Color(0xFFF1F5F9),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.location_on,
-                                  size: 12, color: Color(0xFF64748B)),
+                              Icon(
+                                Icons.location_on,
+                                size: 12,
+                                color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                              ),
                               const SizedBox(width: 4),
                               Text(
                                 item.locality,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                  color: Color(0xFF475569),
+                                  color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF475569),
                                 ),
                               ),
                             ],
@@ -1429,10 +1541,10 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                     // Nom du secours
                     Text(
                       item.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF0F172A),
+                        color: isDark ? Colors.white : const Color(0xFF0F172A),
                         height: 1.25,
                       ),
                     ),
@@ -1443,9 +1555,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                         item.address!,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF64748B),
+                          color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
                         ),
                       ),
                     ],
@@ -1461,10 +1573,11 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF8FAFC),
+                              color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
                               borderRadius: BorderRadius.circular(4),
-                              border:
-                                  Border.all(color: const Color(0xFFE2E8F0)),
+                              border: Border.all(
+                                color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                              ),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
@@ -1474,10 +1587,10 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                                 const SizedBox(width: 3),
                                 Text(
                                   s,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w500,
-                                    color: Color(0xFF334155),
+                                    color: isDark ? const Color(0xFFCBD5E1) : const Color(0xFF334155),
                                   ),
                                 ),
                               ],
@@ -1520,7 +1633,9 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                         // Bouton détails
                         OutlinedButton(
                           style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            side: BorderSide(
+                              color: isDark ? const Color(0xFF334155) : const Color(0xFFE2E8F0),
+                            ),
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 10, vertical: 11),
                             shape: RoundedRectangleBorder(
@@ -1528,8 +1643,10 @@ class _EmergencyContactsPageState extends State<EmergencyContactsPage> {
                             ),
                           ),
                           onPressed: () => _showDetailBottomSheet(item),
-                          child: const Icon(Icons.more_horiz,
-                              color: Color(0xFF475569)),
+                          child: Icon(
+                            Icons.more_horiz,
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF475569),
+                          ),
                         ),
                       ],
                     ),
